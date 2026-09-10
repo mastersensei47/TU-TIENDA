@@ -1,4 +1,4 @@
-        :root {
+:root {
             --bg: #0f172a;
             --card: #1e293b;
             --text: #f1f5f9;
@@ -597,8 +597,7 @@ body.precio-mayorista-oculto .precio-mayorista-field { display: none; }
 /* ===== PANEL ADMIN: escritorio y móvil ===== */
 #adminModal {
     padding: 16px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     align-items: flex-start;
 }
 #adminModal .modal-content {
