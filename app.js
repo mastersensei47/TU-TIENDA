@@ -878,6 +878,19 @@ function elegirSugerencia(id) {
     render();
 }
 
+// Limpia la lista de imágenes de un producto para el modal de detalle:
+// saca vacíos/espacios y URLs duplicadas, manteniendo el orden original.
+function normalizarImagenesLista(lista) {
+    if (!Array.isArray(lista)) return [];
+    const vistas = new Set();
+    const limpia = [];
+    lista.forEach(url => {
+        const u = String(url || "").trim();
+        if (u && !vistas.has(u)) { vistas.add(u); limpia.push(u); }
+    });
+    return limpia;
+}
+
 async function showProductDetail(id) {
     const p = prods.find(x => x.id === id);
     if (!p) return;
