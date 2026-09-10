@@ -801,7 +801,7 @@ function render() {
 
     cont.innerHTML = filtered.map(p => {
         const precioActual = isMay ? (p.precio_may || p.precio) : p.precio;
-        const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://via.placeholder.com/300?text=Sin+imagen');
+        const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://placehold.co/300x300?text=Sin+imagen');
         const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
         return `
             <div class="product-card" data-id="${p.id}" onclick="if(!event.target.closest('.btn-add')) showProductDetail('${p.id}')">
@@ -861,7 +861,7 @@ function actualizarSugerencias() {
     if (candidatos.length === 0) { box.style.display = "none"; box.innerHTML = ""; return; }
 
     box.innerHTML = candidatos.map(p => {
-        const img = (p.imagenes && p.imagenes[0]) ? p.imagenes[0] : (p.imagen || 'https://via.placeholder.com/40');
+        const img = (p.imagenes && p.imagenes[0]) ? p.imagenes[0] : (p.imagen || 'https://placehold.co/40x40');
         return `<div class="suggestion-item" onmousedown="elegirSugerencia('${p.id}')">
             <img src="${img}" alt="" loading="lazy">
             <span>${p.nombre}</span>
@@ -886,7 +886,7 @@ async function showProductDetail(id) {
     document.getElementById('detailQtyInput').value = 1;
 
     const imgs = normalizarImagenesLista((p.imagenes && p.imagenes.length > 0) ? [...p.imagenes] : (p.imagen ? [p.imagen] : []));
-    if (!imgs.length) imgs.push('https://via.placeholder.com/600?text=Sin+imagen');
+    if (!imgs.length) imgs.push('https://placehold.co/600x600?text=Sin+imagen');
 
     document.getElementById('detailImg').src = imgs[0];
     const thumbsContainer = document.getElementById('thumbnails');
@@ -1278,7 +1278,7 @@ function renderAdmP() {
     list.innerHTML = filtered.length === 0
         ? `<p style="text-align:center; padding:40px; opacity:0.4;">No se encontraron productos.</p>`
         : filtered.map(p => {
-            const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://via.placeholder.com/70');
+            const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://placehold.co/70x70');
             const stockBajo = !p.tieneVariantes && typeof p.stock === 'number' && p.stock < UMBRAL_STOCK_BAJO;
             return `
             <div class="admin-item" style="${stockBajo ? 'border-left:4px solid var(--danger); background:rgba(239,68,68,0.08);' : ''}">
@@ -1296,6 +1296,58 @@ function renderAdmP() {
                 </div>
             </div>`;
         }).join("");
+}
+
+// ==================== GALERÍA DE IMÁGENES DEL PRODUCTO (panel admin) ====================
+// Estas 3 funciones faltaban por completo en el archivo: el botón
+// "+ AGREGAR IMAGEN" no hacía nada y al guardar el producto no se
+// mandaban imágenes, por eso el catálogo público mostraba todo en blanco.
+
+function cargarImagenesProducto(imagenes = []) {
+    const cont = document.getElementById("imagenesProducto");
+    if (!cont) return;
+    cont.innerHTML = "";
+    const lista = Array.isArray(imagenes) ? imagenes.filter(u => (u || "").trim()) : [];
+    if (lista.length === 0) {
+        agregarImagenProducto();
+        return;
+    }
+    lista.forEach(url => agregarImagenProducto(url));
+}
+
+function agregarImagenProducto(url = "") {
+    const cont = document.getElementById("imagenesProducto");
+    if (!cont) return;
+    const row = document.createElement("div");
+    row.className = "image-url-row";
+    row.innerHTML = `
+        <span class="image-number"></span>
+        <input class="image-url-input" type="url" placeholder="https://i.postimg.cc/..." value="${String(url).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}">
+        <button type="button" title="Eliminar imagen" aria-label="Eliminar imagen">✕</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+        row.remove();
+        const cont2 = document.getElementById("imagenesProducto");
+        if (cont2 && !cont2.querySelector(".image-url-row")) agregarImagenProducto();
+        renumerarImagenesProducto();
+    });
+    cont.appendChild(row);
+    renumerarImagenesProducto();
+}
+
+function renumerarImagenesProducto() {
+    const cont = document.getElementById("imagenesProducto");
+    if (!cont) return;
+    [...cont.querySelectorAll(".image-url-row")].forEach((row, i) => {
+        const num = row.querySelector(".image-number");
+        if (num) num.textContent = i + 1;
+    });
+}
+
+function obtenerImagenesProducto() {
+    const cont = document.getElementById("imagenesProducto");
+    if (!cont) return [];
+    return [...cont.querySelectorAll(".image-url-input")].map(inp => inp.value.trim()).filter(Boolean);
 }
 
 function normalizarLinksProducto(links) {
