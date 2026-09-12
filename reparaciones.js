@@ -80,7 +80,23 @@ function conElRep(id, fn) {
 
 function leerSlug() {
     const raw = new URLSearchParams(location.search).get("slug");
-    const slug = (raw || "").trim().toLowerCase();
+    let slug = (raw || "").trim().toLowerCase();
+    if (!slug) {
+        // La app instalada (ícono del celu/PC) abre sin parámetros en la
+        // URL, porque el manifest no puede llevar el slug adentro. Acá
+        // recuperamos el último negocio usado en este dispositivo y
+        // reescribimos la URL, para que quede como si lo hubieran
+        // escrito a mano — el resto del código ni se entera.
+        try {
+            const guardado = (localStorage.getItem("tu_taller_ultimo_slug") || "").trim().toLowerCase();
+            if (guardado) {
+                slug = guardado;
+                const url = new URL(location.href);
+                url.searchParams.set("slug", slug);
+                history.replaceState(null, "", url);
+            }
+        } catch (_) {}
+    }
     return slug || null;
 }
 
@@ -151,6 +167,7 @@ function guardarCacheTaller(slug, data) {
 async function bootstrap() {
     const slug = leerSlug();
     if (!slug) return mostrarErrorSlug("Falta indicar el negocio en el link (falta ?slug=... en la URL).");
+    try { localStorage.setItem("tu_taller_ultimo_slug", slug); } catch (_) {}
     if (!(await esperarFirebaseTaller(80))) {
         return mostrarErrorSlug("No pudimos iniciar Firebase. Recargá la página y probá nuevamente.");
     }
