@@ -606,7 +606,18 @@ body.precio-mayorista-oculto .precio-mayorista-field { display: none; }
     padding: 30px;
     overflow: auto;
     overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) transparent;
 }
+#adminModal .modal-content::-webkit-scrollbar { width: 8px; }
+#adminModal .modal-content::-webkit-scrollbar-track { background: transparent; }
+#adminModal .modal-content::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+#adminModal .modal-content::-webkit-scrollbar-thumb:hover { opacity: 0.8; }
 #adminModal .admin-tabs {
     display: flex;
     flex-wrap: nowrap;
