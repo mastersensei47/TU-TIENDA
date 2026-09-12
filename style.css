@@ -247,7 +247,6 @@
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.94);
-            backdrop-filter: blur(15px);
             display: none;
             justify-content: center;
             align-items: flex-start;
@@ -359,7 +358,6 @@
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0.94);
-            backdrop-filter: blur(15px);
             display: none;
             justify-content: center;
             align-items: center;
@@ -472,7 +470,6 @@
             background: rgba(0,0,0,0.8);
             display: none;
             z-index: 5500;
-            backdrop-filter: blur(6px);
         }
         .overlay.active { display: block; }
         .form-group { margin-bottom: 22px; }
@@ -485,6 +482,7 @@
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 1px;
+            user-select: none;
         }
         input, select, textarea {
             width: 100%;
@@ -647,7 +645,7 @@ body.precio-mayorista-oculto .precio-mayorista-field { display: none; }
 }
 .admin-product-search input { flex:1; min-width:0; }
 .admin-search-count { font-size:12px; opacity:.55; white-space:nowrap; }
-.admin-help { opacity:.55; font-size:11px; margin:6px 0 10px; line-height:1.45; }
+.admin-help { opacity:.55; font-size:11px; margin:6px 0 10px; line-height:1.45; user-select: none; }
 .image-url-list { display:flex; flex-direction:column; gap:9px; }
 .image-url-row { display:flex; align-items:center; gap:8px; }
 .image-url-row input { flex:1; min-width:0; }
