@@ -336,6 +336,7 @@ function init() {
             if (adminDoc.exists) {
                 esAdmin = true;
                 if (logout) logout.style.display = "block";
+                mostrarPerfilAdmin();
                 cargarDatosAdmin();
                 // Firebase puede haber entregado productos/hero antes de resolver Auth.
                 // Renderizamos el panel ahora que ya sabemos que es administrador.
@@ -693,8 +694,20 @@ function borrarCategoriaEditor(i) {
 
 function mostrarPerfilVacio() {
     document.getElementById("perfilContenido").style.display = "none";
-    document.getElementById("perfilVacio").style.display = "block";
+    const vacio = document.getElementById("perfilVacio");
+    vacio.style.display = "block";
+    vacio.innerHTML = `<div style="font-size:50px; margin-bottom:20px;">👤</div><p>Iniciá sesión para ver tu información y precios especiales.</p>`;
     document.getElementById("logoutBtn").style.display = "none";
+}
+
+// Cuando quien inició sesión es el administrador (no un cliente mayorista),
+// el cartel de "iniciá sesión para ver tus precios" no aplica — mostramos
+// un aviso corto en su lugar.
+function mostrarPerfilAdmin() {
+    document.getElementById("perfilContenido").style.display = "none";
+    const vacio = document.getElementById("perfilVacio");
+    vacio.style.display = "block";
+    vacio.innerHTML = `<div style="font-size:50px; margin-bottom:20px;">🛠️</div><p>Sesión de administrador iniciada.</p>`;
 }
 
 // ==================== NOTIFICACIÓN AUTOMÁTICA POR EMAIL (opcional) ====================
