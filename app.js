@@ -1223,6 +1223,20 @@ function llenarPerfil(data) {
     document.getElementById("p-tel").innerText = data.tel || "--";
     document.getElementById("p-dir").innerText = data.dir || "Sin dirección registrada";
     document.getElementById("misPedidosList").innerHTML = ""; // se carga recién al tocar el botón
+
+    // El cartel de "mayorista" solo tiene sentido si la tienda vende con
+    // precios mayoristas. En una tienda solo minorista, esto no debe
+    // mencionar la palabra "mayorista" para nada.
+    const estadoEl = document.getElementById("p-estadoMayorista");
+    if (estadoEl) {
+        if (STORE_CONFIG.features.wholesalePricing) {
+            estadoEl.style.display = "block";
+            estadoEl.innerText = "✓ ESTADO: CLIENTE MAYORISTA ACTIVO";
+        } else {
+            estadoEl.style.display = "block";
+            estadoEl.innerText = "✓ CUENTA ACTIVA";
+        }
+    }
 }
 
 // Le muestra al cliente logueado sus propios pedidos (las reglas de
@@ -2056,10 +2070,10 @@ async function guardarConfigTienda() {
 
     const themeBase = presetTemaSeleccionado || STORE_CONFIG.theme;
 
-    // El modo de negocio deriva automáticamente si se muestra precio
-    // mayorista y el registro de clientes — así el dueño elige UNA sola
-    // cosa ("minorista") y no tiene que ir a prender/apagar 2 interruptores
-    // por separado para lograr lo mismo.
+    // El modo de negocio define si se muestra precio mayorista, pero el
+    // registro de cuentas queda SIEMPRE disponible — sirve para que
+    // cualquier cliente (mayorista o no) pueda ver su historial de
+    // pedidos ("Ver mis pedidos"), tenga o no precios especiales.
     const businessMode = document.getElementById("cfgBusinessMode").value;
     const esSoloMinorista = businessMode === "minorista";
 
@@ -2095,7 +2109,7 @@ async function guardarConfigTienda() {
             heroSlider: document.getElementById("cfgMostrarHero").checked,
             mostrarMapa: document.getElementById("cfgMostrarMapa").checked,
             wholesalePricing: !esSoloMinorista,
-            userRegistration: !esSoloMinorista
+            userRegistration: true
         },
         layout: {
             catalogView: document.getElementById("cfgCatalogView").value,
