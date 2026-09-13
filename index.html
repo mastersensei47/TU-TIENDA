@@ -281,6 +281,11 @@
                 <h4 style="margin-top:30px; opacity:0.7;">Experiencia visual</h4>
                 <div class="form-group"><label>URL del logo (vacío = se muestra el nombre en texto)</label><input id="cfgLogoUrl" placeholder="https://..."></div>
                 <div class="form-group">
+                    <label>Ícono de la app al instalarla</label>
+                    <input id="cfgPwaIconUrl" placeholder="https://... (vacío = ícono genérico)">
+                    <p class="admin-help">Usá una imagen cuadrada (ideal 512x512). Es el ícono que se ve cuando alguien instala tu tienda como app en el celu o la PC — no tiene por qué ser el mismo que el logo.</p>
+                </div>
+                <div class="form-group">
                     <label>Tema rápido (opcional — pisa los colores de abajo, con vista previa al instante)</label>
                     <select id="cfgThemePreset" onchange="aplicarPresetTema()">
                         <option value="">— Elegir un tema... —</option>
