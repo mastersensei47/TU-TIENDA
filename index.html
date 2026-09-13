@@ -450,8 +450,11 @@
 <div id="infoDrawer" class="drawer">
     <div class="drawer-header">
         <div class="flex-between">
-            <h2 id="drawerBrand" style="margin:0; color:var(--accent); font-size:28px;"></h2>
-            <span onclick="closeAll()" style="cursor:pointer; font-size:28px; opacity:0.5;">✕</span>
+            <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                <h2 id="drawerBrand" style="margin:0; color:var(--accent); font-size:28px;"></h2>
+                <button onclick="verificarAdmin()" title="Panel admin" style="background:rgba(255,255,255,0.08); border:none; color:inherit; width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0;">⚙️</button>
+            </div>
+            <span onclick="closeAll()" style="cursor:pointer; font-size:28px; opacity:0.5; flex-shrink:0;">✕</span>
         </div>
     </div>
     <div style="padding:25px 25px 0 25px; flex-grow:1; display:flex; flex-direction:column;">
@@ -486,7 +489,6 @@
             <p>Iniciá sesión para ver tu información y precios especiales.</p>
         </div>
         <div style="padding-top:20px; border-top:1px solid rgba(255,255,255,0.05); margin-top: auto;">
-            <button class="btn-add" style="background:rgba(255,255,255,0.08); margin-top:0; margin-bottom:15px;" onclick="verificarAdmin()">⚙️ PANEL ADMIN</button>
             <button id="logoutBtn" onclick="logout()" style="display:none; width:100%; background:var(--danger); color:white; border:none; padding:18px; border-radius:18px; font-weight:800; cursor:pointer; margin-bottom:15px;">CERRAR SESIÓN</button>
             <p id="footerVersion" style="font-size:10px; text-align:center; opacity:0.3; font-weight:700;"></p>
         </div>
