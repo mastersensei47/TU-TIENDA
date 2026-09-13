@@ -280,10 +280,25 @@
 
                 <h4 style="margin-top:30px; opacity:0.7;">Experiencia visual</h4>
                 <div class="form-group"><label>URL del logo (vacío = se muestra el nombre en texto)</label><input id="cfgLogoUrl" placeholder="https://..."></div>
-                <div class="form-group">
-                    <label>Ícono de la app al instalarla</label>
-                    <input id="cfgPwaIconUrl" placeholder="https://... (vacío = ícono genérico)">
-                    <p class="admin-help">Usá una imagen cuadrada (ideal 512x512). Es el ícono que se ve cuando alguien instala tu tienda como app en el celu o la PC — no tiene por qué ser el mismo que el logo.</p>
+
+                <h4 style="margin-top:30px; opacity:0.7;">📲 Instalación como app</h4>
+                <div class="admin-form-box" style="margin-bottom:22px;">
+                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:700; margin-bottom:4px;">
+                        <input id="cfgPwaEnabled" type="checkbox" style="width:18px; height:18px;">
+                        Permitir instalar la tienda como app
+                    </label>
+                    <p class="admin-help" style="margin-top:2px;">Si lo apagás, desaparece el botón 📲 del header y nadie va a poder instalarla en su celu o PC.</p>
+
+                    <div class="form-group" style="margin-top:18px;">
+                        <label>Nombre de la app instalada</label>
+                        <input id="cfgPwaAppName" placeholder="Vacío = se usa el nombre de la tienda">
+                        <p class="admin-help">Es el nombre corto que aparece debajo del ícono en el celu/escritorio. Conviene algo cortito — el nombre completo de la tienda a veces no entra.</p>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Ícono de la app al instalarla</label>
+                        <input id="cfgPwaIconUrl" placeholder="https://... (vacío = ícono genérico)">
+                        <p class="admin-help">Usá una imagen cuadrada (ideal 512x512). No tiene por qué ser el mismo que el logo.</p>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Tema rápido (opcional — pisa los colores de abajo, con vista previa al instante)</label>
