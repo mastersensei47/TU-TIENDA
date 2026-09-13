@@ -40,7 +40,7 @@ function mostrarErrorSlug(mensaje) {
 // Valores por defecto para cualquier campo de config/tienda que un cliente
 // no haya cargado todavía, así el sitio nunca se rompe por un dato faltante.
 const CONFIG_DEFAULTS = {
-    storeName: "Tienda", tagline: "", city: "", logoUrl: "",
+    storeName: "Tienda", tagline: "", city: "", logoUrl: "", pwaIconUrl: "",
     address: "", horarios: "",
     businessType: "generico", businessMode: "ambos", // "mayorista" | "minorista" | "ambos"
     whatsappNumber: "", instagramUrl: "", facebookUrl: "", tiktokUrl: "",
@@ -520,12 +520,53 @@ function aplicarLayout() {
 }
 
 // ==================== PWA / INSTALACIÓN ====================
+// Cada tienda (slug) tiene que instalarse como una app DISTINTA, no como
+// la misma para todo el mundo — si no, el navegador las confunde entre sí
+// y una instalación puede pisar o reemplazar a otra. Por eso generamos el
+// manifest.json al vuelo (con el slug adentro del id/start_url) en vez de
+// usar siempre el mismo archivo estático.
+let manifestBlobUrlActual = null;
 function aplicarManifestPWA() {
     const link = document.querySelector('link[rel="manifest"]');
-    if (!link) return;
-    // Siempre usamos el manifest real servido desde GitHub Pages. No se genera
-    // ningún Blob dinámico porque los navegadores pueden ignorarlo para PWA.
-    link.href = new URL("manifest-tienda.json", location.href).href;
+    if (!link || !STORE_CONFIG || !STORE_CONFIG.storeId) return;
+
+    const base = new URL("index.html", location.href);
+    base.search = `?slug=${encodeURIComponent(STORE_CONFIG.storeId)}`;
+    const startUrl = base.href;
+
+    const iconUrl = (STORE_CONFIG.pwaIconUrl || "").trim() || new URL("icon-512.png", location.href).href;
+    const nombre = STORE_CONFIG.storeName || "Tienda";
+
+    const manifest = {
+        name: nombre,
+        short_name: nombre.slice(0, 20),
+        id: startUrl,
+        start_url: startUrl,
+        scope: new URL("index.html", location.href).href,
+        display: "standalone",
+        display_override: ["standalone", "minimal-ui"],
+        background_color: (STORE_CONFIG.theme && STORE_CONFIG.theme.bg) || "#0f172a",
+        theme_color: (STORE_CONFIG.theme && STORE_CONFIG.theme.accent) || "#3b82f6",
+        icons: [
+            { src: iconUrl, sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: iconUrl, sizes: "512x512", type: "image/png", purpose: "any" }
+        ],
+        prefer_related_applications: false,
+        lang: "es",
+        dir: "ltr"
+    };
+
+    const blob = new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" });
+    const nuevaUrl = URL.createObjectURL(blob);
+    link.href = nuevaUrl;
+    // Liberamos el Blob anterior (si lo hubiera) recién después de asignar
+    // el nuevo, para no dejar al navegador sin manifest en el medio.
+    if (manifestBlobUrlActual) URL.revokeObjectURL(manifestBlobUrlActual);
+    manifestBlobUrlActual = nuevaUrl;
+
+    // El ícono para iPhone/iPad (Safari no lee el manifest para esto).
+    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    if (appleIcon) appleIcon.href = iconUrl;
 }
 
 function registrarServiceWorker() {
@@ -1970,6 +2011,7 @@ function cargarFormConfig() {
     document.getElementById("cfgPagoMercadoPago").checked = !!pagos.mercadopago;
 
     document.getElementById("cfgLogoUrl").value = STORE_CONFIG.logoUrl || "";
+    document.getElementById("cfgPwaIconUrl").value = STORE_CONFIG.pwaIconUrl || "";
     document.getElementById("cfgThemePreset").value = "";
     presetTemaSeleccionado = null;
     accentEl.value = STORE_CONFIG.theme.accent || "#3b82f6";
@@ -2037,6 +2079,7 @@ async function guardarConfigTienda() {
             mercadopago: document.getElementById("cfgPagoMercadoPago").checked
         },
         logoUrl: document.getElementById("cfgLogoUrl").value.trim(),
+        pwaIconUrl: document.getElementById("cfgPwaIconUrl").value.trim(),
         theme: { ...themeBase, accent: document.getElementById("cfgAccent").value, bg: document.getElementById("cfgBg").value, radius: document.getElementById("cfgRadius").value },
         features: {
             ...STORE_CONFIG.features,
@@ -2065,6 +2108,7 @@ async function guardarConfigTienda() {
         aplicarTema();
         aplicarBranding();
         aplicarLayout();
+        aplicarManifestPWA();
         renderMapa();
         renderBanners();
         renderMetodoPagoSelector();
