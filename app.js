@@ -40,7 +40,7 @@ function mostrarErrorSlug(mensaje) {
 // Valores por defecto para cualquier campo de config/tienda que un cliente
 // no haya cargado todavía, así el sitio nunca se rompe por un dato faltante.
 const CONFIG_DEFAULTS = {
-    storeName: "Tienda", tagline: "", city: "", logoUrl: "", pwaIconUrl: "",
+    storeName: "Tienda", tagline: "", city: "", logoUrl: "", pwaIconUrl: "", pwaAppName: "", pwaEnabled: true,
     address: "", horarios: "",
     businessType: "generico", businessMode: "ambos", // "mayorista" | "minorista" | "ambos"
     whatsappNumber: "", instagramUrl: "", facebookUrl: "", tiktokUrl: "",
@@ -535,7 +535,7 @@ function aplicarManifestPWA() {
     const startUrl = base.href;
 
     const iconUrl = (STORE_CONFIG.pwaIconUrl || "").trim() || new URL("icon-512.png", location.href).href;
-    const nombre = STORE_CONFIG.storeName || "Tienda";
+    const nombre = (STORE_CONFIG.pwaAppName || "").trim() || STORE_CONFIG.storeName || "Tienda";
 
     const manifest = {
         name: nombre,
@@ -587,6 +587,11 @@ function prepararInstalacionPWA() {
     const btn = document.getElementById("btnInstalarApp");
     if (!btn) return;
 
+    if (!STORE_CONFIG.pwaEnabled) {
+        btn.style.display = "none";
+        return;
+    }
+
     if (esTiendaInstalada()) {
         btn.style.display = "none";
         return;
@@ -599,7 +604,7 @@ function prepararInstalacionPWA() {
 
     const recibirPrompt = () => {
         deferredInstallPrompt = window.__tuTiendaInstallPrompt || deferredInstallPrompt;
-        if (!esTiendaInstalada()) btn.style.display = "inline-flex";
+        if (STORE_CONFIG.pwaEnabled && !esTiendaInstalada()) btn.style.display = "inline-flex";
     };
     window.addEventListener("tu-tienda-install-ready", recibirPrompt);
     window.addEventListener("appinstalled", () => {
@@ -2012,6 +2017,8 @@ function cargarFormConfig() {
 
     document.getElementById("cfgLogoUrl").value = STORE_CONFIG.logoUrl || "";
     document.getElementById("cfgPwaIconUrl").value = STORE_CONFIG.pwaIconUrl || "";
+    document.getElementById("cfgPwaAppName").value = STORE_CONFIG.pwaAppName || "";
+    document.getElementById("cfgPwaEnabled").checked = STORE_CONFIG.pwaEnabled !== false;
     document.getElementById("cfgThemePreset").value = "";
     presetTemaSeleccionado = null;
     accentEl.value = STORE_CONFIG.theme.accent || "#3b82f6";
@@ -2080,6 +2087,8 @@ async function guardarConfigTienda() {
         },
         logoUrl: document.getElementById("cfgLogoUrl").value.trim(),
         pwaIconUrl: document.getElementById("cfgPwaIconUrl").value.trim(),
+        pwaAppName: document.getElementById("cfgPwaAppName").value.trim(),
+        pwaEnabled: document.getElementById("cfgPwaEnabled").checked,
         theme: { ...themeBase, accent: document.getElementById("cfgAccent").value, bg: document.getElementById("cfgBg").value, radius: document.getElementById("cfgRadius").value },
         features: {
             ...STORE_CONFIG.features,
@@ -2109,6 +2118,10 @@ async function guardarConfigTienda() {
         aplicarBranding();
         aplicarLayout();
         aplicarManifestPWA();
+        {
+            const btnPwa = document.getElementById("btnInstalarApp");
+            if (btnPwa) btnPwa.style.display = (STORE_CONFIG.pwaEnabled && !esTiendaInstalada()) ? "inline-flex" : "none";
+        }
         renderMapa();
         renderBanners();
         renderMetodoPagoSelector();
