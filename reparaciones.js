@@ -607,12 +607,67 @@ function calcularCostosGanancia(repuestos, manoDeObra, precioCobrado) {
     return { costoTotal, ganancia };
 }
 
+// Repuestos en formato de filas (nombre + costo), igual que los links de
+// descarga de la tienda. Acepta también el formato viejo de texto plano
+// ("Nombre | Costo" por línea) para no perder los trabajos ya cargados.
 function parsearRepuestos(texto) {
-    if (!texto || !texto.trim()) return [];
-    return texto.trim().split('\n').map(linea => {
+    if (Array.isArray(texto)) {
+        return texto.map(r => ({
+            nombre: String((r || {}).nombre || "").trim(),
+            costo: Number((r || {}).costo) || 0
+        })).filter(r => r.nombre);
+    }
+    if (!texto || !String(texto).trim()) return [];
+    return String(texto).trim().split('\n').map(linea => {
         const [nombre, costoStr] = linea.split('|').map(s => (s || '').trim());
         return nombre ? { nombre, costo: parseFloat(costoStr) || 0 } : null;
     }).filter(Boolean);
+}
+
+function obtenerRepuestos() {
+    const cont = document.getElementById("repuestosLista");
+    if (!cont) return [];
+    return [...cont.querySelectorAll(".repuesto-row")].map(row => ({
+        nombre: row.querySelector(".repuesto-nombre")?.value.trim() || "",
+        costo: parseFloat(row.querySelector(".repuesto-costo")?.value) || 0
+    })).filter(x => x.nombre);
+}
+
+function renderRepuestos(lista = []) {
+    const cont = document.getElementById("repuestosLista");
+    if (!cont) return;
+    const items = parsearRepuestos(lista);
+    cont.innerHTML = "";
+    if (items.length === 0) {
+        agregarRepuesto();
+        return;
+    }
+    items.forEach(r => agregarRepuesto(r.nombre, r.costo));
+}
+
+function agregarRepuesto(nombre = "", costo = "") {
+    const cont = document.getElementById("repuestosLista");
+    if (!cont) return;
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const row = document.createElement("div");
+    row.className = "download-link-row repuesto-row";
+    row.innerHTML = `
+        <input class="download-link-name repuesto-nombre" placeholder="Repuesto o material" value="${esc(nombre)}">
+        <input class="download-link-url repuesto-costo" type="number" placeholder="Costo" value="${costo === "" ? "" : esc(costo)}">
+        <button type="button" title="Eliminar repuesto" aria-label="Eliminar repuesto">✕</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+        row.remove();
+        const cont2 = document.getElementById("repuestosLista");
+        if (cont2 && !cont2.querySelector(".repuesto-row")) agregarRepuesto();
+        if (typeof actualizarResumenCostos === "function") actualizarResumenCostos();
+    });
+    row.querySelectorAll("input").forEach(inp => {
+        inp.addEventListener("input", () => {
+            if (typeof actualizarResumenCostos === "function") actualizarResumenCostos();
+        });
+    });
+    cont.appendChild(row);
 }
 
 function normalizarTextoRep(s) {
@@ -709,7 +764,7 @@ function abrirFormNuevo() {
     document.getElementById("rTelefono").value = "";
     document.getElementById("rEquipo").value = "";
     document.getElementById("rProblema").value = "";
-    document.getElementById("rRepuestos").value = "";
+    renderRepuestos([]);
     document.getElementById("rManoObra").value = "";
     document.getElementById("rPrecio").value = "";
     document.getElementById("rEstado").value = "pendiente";
@@ -731,7 +786,7 @@ function editarReparacion(id) {
     document.getElementById("rTelefono").value = r.telefono || "";
     document.getElementById("rEquipo").value = r.equipo || "";
     document.getElementById("rProblema").value = r.problema || "";
-    document.getElementById("rRepuestos").value = (r.repuestos || []).map(x => `${x.nombre} | ${x.costo}`).join('\n');
+    renderRepuestos(r.repuestos || []);
     document.getElementById("rManoObra").value = r.manoDeObra || "";
     document.getElementById("rPrecio").value = r.precioCobrado || "";
     document.getElementById("rEstado").value = r.estado || "pendiente";
@@ -749,7 +804,7 @@ function cerrarFormModal() {
 }
 
 function actualizarGananciaPreview() {
-    const repuestos = parsearRepuestos(document.getElementById("rRepuestos").value);
+    const repuestos = obtenerRepuestos();
     const manoDeObra = document.getElementById("rManoObra").value;
     const precio = document.getElementById("rPrecio").value;
     const { costoTotal, ganancia } = calcularCostosGanancia(repuestos, manoDeObra, precio);
@@ -762,7 +817,7 @@ async function guardarReparacion() {
     const equipo = document.getElementById("rEquipo").value.trim();
     if (!cliente || !equipo) return alert(`Completá al menos el cliente y ${presetRubro().campoObjeto.toLowerCase()}`);
 
-    const repuestos = parsearRepuestos(document.getElementById("rRepuestos").value);
+    const repuestos = obtenerRepuestos();
     const manoDeObra = parseFloat(document.getElementById("rManoObra").value) || 0;
     const precioCobrado = parseFloat(document.getElementById("rPrecio").value) || 0;
     const { costoTotal, ganancia } = calcularCostosGanancia(repuestos, manoDeObra, precioCobrado);
@@ -841,7 +896,7 @@ function exportarReparacionesCSV() {
 }
 
 // Vista previa de la ganancia mientras se completa el formulario
-["rRepuestos", "rManoObra", "rPrecio"].forEach(id => {
+["rManoObra", "rPrecio"].forEach(id => {
     document.addEventListener("input", (e) => {
         if (e.target && e.target.id === id) actualizarGananciaPreview();
     });
