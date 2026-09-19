@@ -47,6 +47,7 @@ const CONFIG_DEFAULTS = {
     currency: "$", mapaUrl: "",
     pausada: false, bannerActivo: false, bannerTexto: "", bannerBgColor: "#f59e0b", bannerTextColor: "#000000",
     pagos: { efectivo: true, transferencia: false, mercadopago: false, datosTransferencia: "" },
+    envios: { activo: false, info: "" },
     features: { wholesalePricing: true, stockControl: true, heroSlider: true, userRegistration: true, productVariants: false, mostrarMapa: false },
     layout: {
         catalogView: "grid2",     // "grid2" | "grid1" | "list"
@@ -60,15 +61,7 @@ const CONFIG_DEFAULTS = {
     categories: [],
     theme: { bg: "#0f172a", card: "#1e293b", text: "#f1f5f9", accent: "#3b82f6", success: "#10b981", promo: "#f59e0b", danger: "#ef4444", radius: "18px" },
     notifications: { emailEnabled: false, emailJsServiceId: "", emailJsTemplateId: "", emailJsPublicKey: "", adminEmail: "" },
-    whatsappTemplate: "",
-    horarioAtencion: {
-        activo: false,
-        bloquear: false,
-        dias: [0, 1, 2, 3, 4, 5, 6],
-        desde: "08:00",
-        hasta: "18:00",
-        mensaje: "En este momento estamos fuera de nuestro horario de atención."
-    }
+    whatsappTemplate: ""
 };
 
 function leerCacheTienda(slug) {
@@ -90,8 +83,8 @@ function construirStoreConfig(slug, datosTienda) {
         theme: { ...CONFIG_DEFAULTS.theme, ...(datosTienda.theme || {}) },
         notifications: { ...CONFIG_DEFAULTS.notifications, ...(datosTienda.notifications || {}) },
         pagos: { ...CONFIG_DEFAULTS.pagos, ...(datosTienda.pagos || {}) },
+        envios: { ...CONFIG_DEFAULTS.envios, ...(datosTienda.envios || {}) },
         layout: { ...CONFIG_DEFAULTS.layout, ...(datosTienda.layout || {}) },
-        horarioAtencion: { ...CONFIG_DEFAULTS.horarioAtencion, ...(datosTienda.horarioAtencion || {}) },
         storeId: slug
     };
 }
@@ -321,8 +314,6 @@ function init() {
         ["aplicarOpenGraph", aplicarOpenGraph],
         ["registrarServiceWorker", registrarServiceWorker],
         ["prepararInstalacionPWA", prepararInstalacionPWA],
-        ["iniciarChequeoHorario", iniciarChequeoHorario],
-        ["actualizarAvisoHorario", actualizarAvisoHorario],
         ["cargarFormConfig", cargarFormConfig],
     ];
     pasos.forEach(([nombre, fn]) => {
@@ -1223,76 +1214,6 @@ function updateCartUI() {
     }).join("");
     document.getElementById("cartTotal").innerText = STORE_CONFIG.currency + total;
     document.getElementById("cartCount").innerText = count;
-    actualizarAvisoHorario();
-}
-
-// ==================== HORARIOS DE ATENCIÓN ====================
-// Chequea si "ahora" cae dentro del horario configurado. Si el control no
-// está activado, siempre devuelve true (no restringe nada).
-function dentroDeHorarioAtencion() {
-    const h = STORE_CONFIG.horarioAtencion;
-    if (!h || !h.activo) return true;
-    const ahora = new Date();
-    const dias = Array.isArray(h.dias) ? h.dias : [0, 1, 2, 3, 4, 5, 6];
-    if (!dias.includes(ahora.getDay())) return false;
-
-    const minutosAhora = ahora.getHours() * 60 + ahora.getMinutes();
-    const [hd, md] = (h.desde || "00:00").split(":").map(Number);
-    const [hh, mh] = (h.hasta || "23:59").split(":").map(Number);
-    const desdeMin = (hd || 0) * 60 + (md || 0);
-    const hastaMin = (hh || 0) * 60 + (mh || 0);
-
-    if (hastaMin >= desdeMin) return minutosAhora >= desdeMin && minutosAhora <= hastaMin;
-    // Rango que cruza la medianoche (ej: 20:00 a 02:00)
-    return minutosAhora >= desdeMin || minutosAhora <= hastaMin;
-}
-
-// Pinta (o esconde) el cartel de fuera-de-horario en el carrito, y
-// bloquea/desbloquea el botón de enviar pedido si el dueño eligió el modo
-// "bloquear pedidos" en vez de solo avisar.
-function actualizarAvisoHorario() {
-    const aviso = document.getElementById("avisoHorario");
-    const btn = document.getElementById("btnFinalizarPedido");
-    const banner = document.getElementById("bannerHorario");
-    const h = STORE_CONFIG.horarioAtencion || {};
-    const fuera = h.activo && !dentroDeHorarioAtencion();
-    const mensaje = h.mensaje || "En este momento estamos fuera de nuestro horario de atención.";
-
-    // Banner arriba de todo: se ve apenas entrás, sin tener que abrir el carrito.
-    if (banner) {
-        banner.style.display = fuera ? "block" : "none";
-        if (fuera) banner.innerText = `⏰ ${mensaje}`;
-    }
-
-    if (!aviso || !btn) return;
-
-    if (!fuera) {
-        aviso.style.display = "none";
-        btn.disabled = false;
-        btn.style.opacity = "1";
-        btn.style.cursor = "pointer";
-        return;
-    }
-
-    aviso.style.display = "block";
-    if (h.bloquear) {
-        aviso.innerText = `⏰ ${mensaje}`;
-        btn.disabled = true;
-        btn.style.opacity = "0.5";
-        btn.style.cursor = "not-allowed";
-    } else {
-        aviso.innerText = `⏰ ${mensaje} Igual podés hacer tu pedido — lo procesamos en cuanto abramos.`;
-        btn.disabled = false;
-        btn.style.opacity = "1";
-        btn.style.cursor = "pointer";
-    }
-}
-
-// Revisa el horario cada minuto — así, si alguien deja el carrito abierto
-// justo cuando cruza la hora de cierre/apertura, el cartel se actualiza
-// solo, sin que haga falta recargar la página.
-function iniciarChequeoHorario() {
-    setInterval(actualizarAvisoHorario, 60000);
 }
 
 function changeQty(idx, delta) {
@@ -2164,7 +2085,21 @@ function extraerUrlIframe(textoPegado) {
 function renderMapa() {
     const cont = document.getElementById("mapaContainer");
     if (!cont) return;
-    if (STORE_CONFIG.features.mostrarMapa && STORE_CONFIG.mapaUrl) {
+    if (!STORE_CONFIG.features.mostrarMapa) {
+        cont.innerHTML = "";
+        cont.style.display = "none";
+        return;
+    }
+    const imagen = (STORE_CONFIG.mapaImagen || "").trim();
+    if (imagen) {
+        // Imagen del local en vez del mapa de Google. Si además hay un mapa
+        // cargado, la imagen se vuelve clickeable para abrirlo aparte.
+        const img = `<img src="${imagen}" alt="Ubicación del local" style="width:100%; height:220px; object-fit:cover; border-radius:var(--radius); display:block;">`;
+        cont.innerHTML = STORE_CONFIG.mapaUrl
+            ? `<a href="${STORE_CONFIG.mapaUrl}" target="_blank" rel="noopener" style="display:block;">${img}</a>`
+            : img;
+        cont.style.display = "block";
+    } else if (STORE_CONFIG.mapaUrl) {
         cont.innerHTML = `<iframe src="${STORE_CONFIG.mapaUrl}" width="100%" height="220" style="border:0; border-radius:var(--radius); display:block;" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
         cont.style.display = "block";
     } else {
@@ -2225,6 +2160,10 @@ function cargarFormConfig() {
     document.getElementById("cfgPagoEfectivo").checked = pagos.efectivo !== false;
     document.getElementById("cfgPagoTransferencia").checked = !!pagos.transferencia;
     renderDatosTransferencia(pagos.datosTransferencia);
+
+    const env = STORE_CONFIG.envios || {};
+    document.getElementById("cfgEnviosActivo").checked = !!env.activo;
+    document.getElementById("cfgEnviosInfo").value = env.info || "";
     document.getElementById("cfgPagoMercadoPago").checked = !!pagos.mercadopago;
 
     document.getElementById("cfgLogoUrl").value = STORE_CONFIG.logoUrl || "";
@@ -2242,6 +2181,7 @@ function cargarFormConfig() {
     document.getElementById("cfgMostrarHero").checked = STORE_CONFIG.features.heroSlider !== false;
     document.getElementById("cfgMostrarMapa").checked = !!STORE_CONFIG.features.mostrarMapa;
     document.getElementById("cfgMapaIframe").value = STORE_CONFIG.mapaUrl || "";
+    document.getElementById("cfgMapaImagen").value = STORE_CONFIG.mapaImagen || "";
 
     cargarCategoriasEditor();
 
@@ -2255,18 +2195,6 @@ function cargarFormConfig() {
     document.getElementById("cfgGlowEffect").checked = !!l.glowEffect;
 
     document.getElementById("cfgWhatsappTemplate").value = STORE_CONFIG.whatsappTemplate || "";
-
-    const h = STORE_CONFIG.horarioAtencion || {};
-    document.getElementById("cfgHorarioActivo").checked = !!h.activo;
-    document.getElementById("cfgHorarioBloquear").checked = !!h.bloquear;
-    document.getElementById("cfgHorarioDesde").value = h.desde || "08:00";
-    document.getElementById("cfgHorarioHasta").value = h.hasta || "18:00";
-    document.getElementById("cfgHorarioMensaje").value = h.mensaje || "";
-    const diasActivos = Array.isArray(h.dias) ? h.dias : [0, 1, 2, 3, 4, 5, 6];
-    [0, 1, 2, 3, 4, 5, 6].forEach(d => {
-        const chk = document.getElementById("cfgHorarioDia" + d);
-        if (chk) chk.checked = diasActivos.includes(d);
-    });
 }
 
 async function guardarConfigTienda() {
@@ -2308,8 +2236,7 @@ async function guardarConfigTienda() {
         pagos: {
             efectivo: document.getElementById("cfgPagoEfectivo").checked,
             transferencia: document.getElementById("cfgPagoTransferencia").checked,
-            datosTransferencia: obtenerDatosTransferencia(),
-            mercadopago: document.getElementById("cfgPagoMercadoPago").checked
+            datosTransferencia: obtenerDatosTransferencia(),            mercadopago: document.getElementById("cfgPagoMercadoPago").checked
         },
         logoUrl: document.getElementById("cfgLogoUrl").value.trim(),
         pwaIconUrl: document.getElementById("cfgPwaIconUrl").value.trim(),
@@ -2333,19 +2260,13 @@ async function guardarConfigTienda() {
             glowEffect: document.getElementById("cfgGlowEffect").checked
         },
         mapaUrl: mapaUrl,
+        mapaImagen: document.getElementById("cfgMapaImagen").value.trim(),
+        envios: {
+            activo: document.getElementById("cfgEnviosActivo").checked,
+            info: document.getElementById("cfgEnviosInfo").value.trim()
+        },
         categories: categoriasEditando,
-        whatsappTemplate: document.getElementById("cfgWhatsappTemplate").value.trim(),
-        horarioAtencion: {
-            activo: document.getElementById("cfgHorarioActivo").checked,
-            bloquear: document.getElementById("cfgHorarioBloquear").checked,
-            dias: [0, 1, 2, 3, 4, 5, 6].filter(d => {
-                const chk = document.getElementById("cfgHorarioDia" + d);
-                return chk && chk.checked;
-            }),
-            desde: document.getElementById("cfgHorarioDesde").value || "08:00",
-            hasta: document.getElementById("cfgHorarioHasta").value || "18:00",
-            mensaje: document.getElementById("cfgHorarioMensaje").value.trim()
-        }
+        whatsappTemplate: document.getElementById("cfgWhatsappTemplate").value.trim()
     };
 
     try {
@@ -2364,9 +2285,9 @@ async function guardarConfigTienda() {
         renderMapa();
         renderBanners();
         renderMetodoPagoSelector();
+        renderEntregaSelector();
         renderCategorias();
         renderCategoriasSelect();
-        actualizarAvisoHorario();
         render(); // por si cambió la vista de catálogo (grid/lista) o el modo minorista/mayorista
         alert(whatsapp ? "✅ Configuración guardada" : "✅ Configuración guardada.\n\n⚠️ Ojo: el WhatsApp para pedidos quedó vacío — el checkout no va a funcionar hasta que lo completes.");
     } catch (e) {
@@ -2421,7 +2342,7 @@ function setCat(el, cat) {
 function metodosPagoActivos() {
     const p = STORE_CONFIG.pagos || {};
     const metodos = [];
-    if (p.efectivo) metodos.push({ id: "efectivo", label: "Efectivo / Contra entrega" });
+    if (p.efectivo) metodos.push({ id: "efectivo", label: "Efectivo" });
     if (p.transferencia) metodos.push({ id: "transferencia", label: "Transferencia bancaria" });
     if (p.mercadopago) metodos.push({ id: "mercadopago", label: "Mercado Pago" });
     return metodos;
@@ -2441,16 +2362,25 @@ function renderMetodoPagoSelector() {
     cont.style.display = "block";
 }
 
+// Selector de entrega: solo aparece si el comercio activó los envíos.
+// Si no, se asume retiro en el local y no se muestra nada.
+function renderEntregaSelector() {
+    const cont = document.getElementById("entregaContainer");
+    if (!cont) return;
+    const envios = STORE_CONFIG.envios || {};
+    cont.style.display = envios.activo ? "block" : "none";
+    const info = document.getElementById("entregaInfo");
+    if (info) {
+        info.innerText = envios.info || "";
+        info.style.display = envios.info ? "block" : "none";
+    }
+}
+
 const PLANTILLA_WHATSAPP_DEFAULT = "*📦 NUEVO PEDIDO — {tienda}*\n*Cliente:* {cliente}\n{pago}----------------------------\n{lista}----------------------------\n*TOTAL ESTIMADO: {total}*";
 
 async function finalizarYEnviar() {
     if (STORE_CONFIG.pausada) return alert("Esta tienda no está recibiendo pedidos en este momento.");
     if (cart.length === 0) return alert("El carrito está vacío.");
-
-    const horario = STORE_CONFIG.horarioAtencion || {};
-    if (horario.activo && horario.bloquear && !dentroDeHorarioAtencion()) {
-        return alert(horario.mensaje || "En este momento estamos fuera de nuestro horario de atención.");
-    }
 
     const clienteTexto = usuarioLogueado
         ? `${usuarioLogueado.user}\n*Local:* ${usuarioLogueado.dir || 'Sin dirección'}`
@@ -2466,6 +2396,12 @@ async function finalizarYEnviar() {
         metodoElegido = (sel && sel.value) || metodos[0].id;
     }
     let pagoTexto = "";
+    const envios = STORE_CONFIG.envios || {};
+    if (envios.activo) {
+        const selEntrega = document.getElementById("entregaSelect");
+        const modo = (selEntrega && selEntrega.value) || "retiro";
+        pagoTexto += `*Entrega:* ${modo === "envio" ? "Envío a domicilio" : "Retiro en el local"}\n`;
+    }
     if (metodoElegido) {
         const metodoInfo = metodos.find(m => m.id === metodoElegido);
         pagoTexto += `*Medio de pago:* ${metodoInfo ? metodoInfo.label : metodoElegido}\n`;
@@ -2527,10 +2463,6 @@ async function finalizarYEnviar() {
         .replaceAll("{pago}", pagoTexto)
         .replaceAll("{lista}", listaTexto)
         .replaceAll("{total}", total);
-
-    if (horario.activo && !horario.bloquear && !dentroDeHorarioAtencion()) {
-        textoPedido += `\n\n⏰ ${horario.mensaje || "Este pedido se hizo fuera de nuestro horario de atención — lo procesamos en cuanto abramos."}`;
-    }
 
     try {
         await batch.commit(); // Ejecuta las actualizaciones de stock
@@ -2602,6 +2534,7 @@ function toggleCart() {
     document.body.classList.toggle("no-scroll", d.classList.contains("active"));
     updateCartUI();
     renderMetodoPagoSelector();
+    renderEntregaSelector();
 }
 
 function closeAll() {
