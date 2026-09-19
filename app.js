@@ -322,6 +322,7 @@ function init() {
         ["registrarServiceWorker", registrarServiceWorker],
         ["prepararInstalacionPWA", prepararInstalacionPWA],
         ["iniciarChequeoHorario", iniciarChequeoHorario],
+        ["actualizarAvisoHorario", actualizarAvisoHorario],
         ["cargarFormConfig", cargarFormConfig],
     ];
     pasos.forEach(([nombre, fn]) => {
@@ -1252,10 +1253,20 @@ function dentroDeHorarioAtencion() {
 function actualizarAvisoHorario() {
     const aviso = document.getElementById("avisoHorario");
     const btn = document.getElementById("btnFinalizarPedido");
-    if (!aviso || !btn) return;
+    const banner = document.getElementById("bannerHorario");
     const h = STORE_CONFIG.horarioAtencion || {};
+    const fuera = h.activo && !dentroDeHorarioAtencion();
+    const mensaje = h.mensaje || "En este momento estamos fuera de nuestro horario de atención.";
 
-    if (!h.activo || dentroDeHorarioAtencion()) {
+    // Banner arriba de todo: se ve apenas entrás, sin tener que abrir el carrito.
+    if (banner) {
+        banner.style.display = fuera ? "block" : "none";
+        if (fuera) banner.innerText = `⏰ ${mensaje}`;
+    }
+
+    if (!aviso || !btn) return;
+
+    if (!fuera) {
         aviso.style.display = "none";
         btn.disabled = false;
         btn.style.opacity = "1";
@@ -1263,7 +1274,6 @@ function actualizarAvisoHorario() {
         return;
     }
 
-    const mensaje = h.mensaje || "En este momento estamos fuera de nuestro horario de atención.";
     aviso.style.display = "block";
     if (h.bloquear) {
         aviso.innerText = `⏰ ${mensaje}`;
@@ -1541,6 +1551,78 @@ function obtenerImagenesProducto() {
     const cont = document.getElementById("imagenesProducto");
     if (!cont) return [];
     return [...cont.querySelectorAll(".image-url-input")].map(inp => inp.value.trim()).filter(Boolean);
+}
+
+// ==================== DATOS DE TRANSFERENCIA (formato de filas) ====================
+// Antes era un textarea donde había que escribir "CBU: ...\nAlias: ..." todo
+// junto. Ahora es una fila por dato (etiqueta + valor), igual que los links
+// de descarga. Acepta el formato viejo (texto plano) y lo convierte solo,
+// así las tiendas que ya tenían datos cargados no pierden nada.
+function normalizarDatosTransferencia(datos) {
+    if (Array.isArray(datos)) {
+        return datos.map(d => ({
+            etiqueta: String((d || {}).etiqueta || (d || {}).label || "").trim(),
+            valor: String((d || {}).valor || (d || {}).value || "").trim()
+        })).filter(x => x.valor);
+    }
+    // Formato viejo: un solo bloque de texto con una línea por dato.
+    if (typeof datos === "string" && datos.trim()) {
+        return datos.split("\n").map(linea => {
+            const l = linea.trim();
+            if (!l) return null;
+            const i = l.indexOf(":");
+            if (i > 0) return { etiqueta: l.slice(0, i).trim(), valor: l.slice(i + 1).trim() };
+            return { etiqueta: "", valor: l };
+        }).filter(x => x && x.valor);
+    }
+    return [];
+}
+
+function obtenerDatosTransferencia() {
+    const cont = document.getElementById("datosTransferenciaLista");
+    if (!cont) return [];
+    return [...cont.querySelectorAll(".transfer-row")].map(row => ({
+        etiqueta: row.querySelector(".transfer-label")?.value.trim() || "",
+        valor: row.querySelector(".transfer-value")?.value.trim() || ""
+    })).filter(x => x.valor);
+}
+
+function renderDatosTransferencia(datos = []) {
+    const cont = document.getElementById("datosTransferenciaLista");
+    if (!cont) return;
+    const lista = normalizarDatosTransferencia(datos);
+    cont.innerHTML = "";
+    if (lista.length === 0) {
+        agregarDatoTransferencia();
+        return;
+    }
+    lista.forEach(d => agregarDatoTransferencia(d.etiqueta, d.valor));
+}
+
+function agregarDatoTransferencia(etiqueta = "", valor = "") {
+    const cont = document.getElementById("datosTransferenciaLista");
+    if (!cont) return;
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const row = document.createElement("div");
+    row.className = "download-link-row transfer-row";
+    row.innerHTML = `
+        <input class="download-link-name transfer-label" placeholder="Dato (ej: CBU)" value="${esc(etiqueta)}">
+        <input class="download-link-url transfer-value" placeholder="Valor (ej: 0000003100010000000001)" value="${esc(valor)}">
+        <button type="button" title="Eliminar dato" aria-label="Eliminar dato">✕</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+        row.remove();
+        const cont2 = document.getElementById("datosTransferenciaLista");
+        if (cont2 && !cont2.querySelector(".transfer-row")) agregarDatoTransferencia();
+    });
+    cont.appendChild(row);
+}
+
+// Convierte las filas al texto que se manda por WhatsApp.
+function textoDatosTransferencia(datos) {
+    return normalizarDatosTransferencia(datos)
+        .map(d => d.etiqueta ? `${d.etiqueta}: ${d.valor}` : d.valor)
+        .join("\n");
 }
 
 function normalizarLinksProducto(links) {
@@ -2142,7 +2224,7 @@ function cargarFormConfig() {
     const pagos = STORE_CONFIG.pagos || {};
     document.getElementById("cfgPagoEfectivo").checked = pagos.efectivo !== false;
     document.getElementById("cfgPagoTransferencia").checked = !!pagos.transferencia;
-    document.getElementById("cfgDatosTransferencia").value = pagos.datosTransferencia || "";
+    renderDatosTransferencia(pagos.datosTransferencia);
     document.getElementById("cfgPagoMercadoPago").checked = !!pagos.mercadopago;
 
     document.getElementById("cfgLogoUrl").value = STORE_CONFIG.logoUrl || "";
@@ -2226,7 +2308,7 @@ async function guardarConfigTienda() {
         pagos: {
             efectivo: document.getElementById("cfgPagoEfectivo").checked,
             transferencia: document.getElementById("cfgPagoTransferencia").checked,
-            datosTransferencia: document.getElementById("cfgDatosTransferencia").value.trim(),
+            datosTransferencia: obtenerDatosTransferencia(),
             mercadopago: document.getElementById("cfgPagoMercadoPago").checked
         },
         logoUrl: document.getElementById("cfgLogoUrl").value.trim(),
@@ -2388,7 +2470,8 @@ async function finalizarYEnviar() {
         const metodoInfo = metodos.find(m => m.id === metodoElegido);
         pagoTexto += `*Medio de pago:* ${metodoInfo ? metodoInfo.label : metodoElegido}\n`;
         if (metodoElegido === "transferencia" && STORE_CONFIG.pagos.datosTransferencia) {
-            pagoTexto += `*Datos para transferir:*\n${STORE_CONFIG.pagos.datosTransferencia}\n`;
+            const txt = textoDatosTransferencia(STORE_CONFIG.pagos.datosTransferencia);
+            if (txt) pagoTexto += `*Datos para transferir:*\n${txt}\n`;
         }
     }
 
