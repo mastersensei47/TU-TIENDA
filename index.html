@@ -69,6 +69,7 @@
     ⚠️ Atención: La tienda no está recibiendo pedidos en este momento.
 </div>
 <div id="bannerPromo" style="display:none; background:var(--promo); color:#000; text-align:center; padding:12px 20px; font-weight:700; font-size:14px;"></div>
+<div id="bannerHorario" style="display:none; background:#f59e0b; color:#000; text-align:center; padding:12px 20px; font-weight:700; font-size:14px;"></div>
 
 <header>
     <div class="header-left">
@@ -96,7 +97,7 @@
 <div class="cat-scroll" id="catBar"></div>
 
 <div class="search-container">
-    <input type="text" id="searchInput" class="search-bar" placeholder="Busca marcas o productos..." autocomplete="off" name="busqueda-productos" readonly
+    <input type="text" id="searchInput" class="search-bar" placeholder="Busca marcas o productos..." autocomplete="off" name="busqueda-productos" data-form-type="other" data-lpignore="true" data-1p-ignore readonly
         onmousedown="this.removeAttribute('readonly')" ontouchstart="this.removeAttribute('readonly')"
         onkeyup="render()" oninput="actualizarSugerencias()" onfocus="this.removeAttribute('readonly'); actualizarSugerencias();"
         onblur="setTimeout(()=>{const b=document.getElementById('searchSuggestions'); if(b) b.style.display='none';}, 150)">
@@ -223,7 +224,9 @@
                 <button class="btn-add" style="background:none; color:white; margin-top:10px; border:1px solid rgba(255,255,255,0.1);" onclick="limpiarP()">Limpiar</button>
             </div>
             <div class="admin-product-search">
-                <input id="adminProductSearch" type="search" placeholder="🔎 Buscar un producto por nombre o categoría..." autocomplete="off" oninput="renderAdmP()">
+                <input id="adminProductSearch" type="search" placeholder="🔎 Buscar un producto por nombre o categoría..." autocomplete="off" name="buscar-producto-admin" data-form-type="other" data-lpignore="true" data-1p-ignore readonly
+                    onmousedown="this.removeAttribute('readonly')" ontouchstart="this.removeAttribute('readonly')" onfocus="this.removeAttribute('readonly')"
+                    oninput="renderAdmP()">
                 <span id="adminProductCount" class="admin-search-count"></span>
             </div>
             <div id="admListP"></div>
@@ -440,7 +443,12 @@
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
                         <input type="checkbox" id="cfgPagoTransferencia" style="width:20px; height:20px;"> Transferencia bancaria
                     </label>
-                    <div class="form-group"><label>Datos para transferir (CBU / Alias / Titular)</label><textarea id="cfgDatosTransferencia" rows="3" placeholder="CBU: ...&#10;Alias: ...&#10;Titular: ..."></textarea></div>
+                    <div class="form-group">
+                        <label>Datos para transferir</label>
+                        <p class="admin-help">Un dato por fila (CBU, Alias, Titular, Banco...). Podés agregar o quitar las filas que quieras.</p>
+                        <div id="datosTransferenciaLista" class="download-links-list"></div>
+                        <button type="button" class="btn-add download-link-add-btn" onclick="agregarDatoTransferencia()">+ Agregar dato</button>
+                    </div>
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
                         <input type="checkbox" id="cfgPagoMercadoPago" style="width:20px; height:20px;"> Mercado Pago
                     </label>
