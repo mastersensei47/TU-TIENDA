@@ -1308,25 +1308,44 @@ async function verMisPedidos() {
     }
 }
 
+// Abre el modal de registro adaptado al modo de la tienda: si vende con
+// precios mayoristas, pide los datos del comercio y la cuenta queda
+// pendiente de aprobación (así el dueño decide quién ve esos precios). Si
+// es solo minorista, no hay nada que aprobar — se salta ese paso y la
+// cuenta queda activa al toque, solo para historial de pedidos.
+function abrirRegistro() {
+    const esMayorista = !!STORE_CONFIG.features.wholesalePricing;
+    document.getElementById("regTitulo").innerText = esMayorista ? "Nueva Solicitud" : "Creá tu cuenta";
+    document.getElementById("regSubtitulo").innerText = esMayorista ? "Completá los datos de tu comercio" : "Para ver tu historial de pedidos";
+    document.getElementById("regDireccionGroup").style.display = esMayorista ? "block" : "none";
+    document.getElementById("regBtnEnviar").innerText = esMayorista ? "ENVIAR PARA REVISIÓN" : "CREAR CUENTA";
+    openModal("regModal");
+}
+
 async function registrarUsuario() {
     if (!STORE_CONFIG.features.userRegistration) {
-        return alert("Esta tienda no acepta registro de cuentas mayoristas en este momento.");
+        return alert("Esta tienda no acepta registro de cuentas en este momento.");
     }
+    const esMayorista = !!STORE_CONFIG.features.wholesalePricing;
     const u = document.getElementById("rU").value.trim();
     const p = document.getElementById("rP").value.trim();
     const t = document.getElementById("rT").value.trim();
     const d = document.getElementById("rD").value.trim();
-    if (!u || !p || !t || !d) return alert("Completá todos los campos");
+    if (!u || !p || !t || (esMayorista && !d)) return alert("Completá todos los campos");
     if (u.includes("@")) return alert("El nombre de usuario no puede contener '@'.");
     if (p.length < 6) return alert("La contraseña debe tener al menos 6 caracteres");
 
     try {
         const cred = await auth.createUserWithEmailAndPassword(toAuthEmail(u), p);
         await db.collection("usuarios").doc(cred.user.uid).set({
-            user: u, tel: t, dir: d, activo: false, fecha: Date.now()
+            user: u, tel: t, dir: d, activo: !esMayorista, fecha: Date.now()
         });
-        await auth.signOut(); // que no quede logueado hasta ser aprobado
-        alert("✅ Solicitud enviada correctamente. Esperá la validación.");
+        if (esMayorista) {
+            await auth.signOut(); // que no quede logueado hasta ser aprobado
+            alert("✅ Solicitud enviada correctamente. Esperá la validación.");
+        } else {
+            alert("✅ ¡Cuenta creada! Ya podés ver tu historial de pedidos.");
+        }
         closeAll();
         document.querySelectorAll('#regModal input, #regModal textarea').forEach(i => i.value = "");
     } catch (e) {
