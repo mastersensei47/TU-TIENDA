@@ -69,7 +69,6 @@
     ⚠️ Atención: La tienda no está recibiendo pedidos en este momento.
 </div>
 <div id="bannerPromo" style="display:none; background:var(--promo); color:#000; text-align:center; padding:12px 20px; font-weight:700; font-size:14px;"></div>
-<div id="bannerHorario" style="display:none; background:#f59e0b; color:#000; text-align:center; padding:12px 20px; font-weight:700; font-size:14px;"></div>
 
 <header>
     <div class="header-left">
@@ -287,29 +286,6 @@
                     <div class="form-group"><label>Facebook (URL completa)</label><input id="cfgFacebook" placeholder="https://facebook.com/tupagina"></div>
                     <div class="form-group"><label>TikTok (URL completa)</label><input id="cfgTiktok" placeholder="https://tiktok.com/@tuusuario"></div>
 
-                    <h4 style="margin-top:30px; opacity:0.7;">⏰ Control automático de horario</h4>
-                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:4px; cursor:pointer; font-weight:700;">
-                        <input type="checkbox" id="cfgHorarioActivo" style="width:20px; height:20px;"> Activar control de horario de atención
-                    </label>
-                    <p class="admin-help">Fuera de estos días/horarios se muestra un aviso en el carrito. Esto es aparte del texto de "Horarios de atención" de arriba (que es solo informativo).</p>
-                    <div style="display:flex; flex-wrap:wrap; gap:8px 16px; margin:14px 0;">
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia0"> Dom</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia1"> Lun</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia2"> Mar</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia3"> Mié</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia4"> Jue</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia5"> Vie</label>
-                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia6"> Sáb</label>
-                    </div>
-                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
-                        <div class="form-group" style="flex:1; min-width:140px;"><label>Desde</label><input id="cfgHorarioDesde" type="time"></div>
-                        <div class="form-group" style="flex:1; min-width:140px;"><label>Hasta</label><input id="cfgHorarioHasta" type="time"></div>
-                    </div>
-                    <div class="form-group"><label>Mensaje fuera de horario</label><input id="cfgHorarioMensaje" placeholder="Ej: Fuera de horario de atención, tu pedido será procesado mañana."></div>
-                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <input type="checkbox" id="cfgHorarioBloquear" style="width:20px; height:20px;"> Bloquear el envío de pedidos fuera de horario (si no, solo se avisa y se puede pedir igual)
-                    </label>
-
                     <h4 style="margin-top:30px; opacity:0.7;">💬 Mensaje de WhatsApp</h4>
                     <p class="admin-help">Plantilla del texto que se manda por WhatsApp al confirmar un pedido. Dejalo vacío para usar el formato de siempre. Placeholders disponibles: <code>{tienda}</code> <code>{cliente}</code> <code>{pago}</code> <code>{lista}</code> <code>{total}</code></p>
                     <div class="form-group"><textarea id="cfgWhatsappTemplate" rows="6" placeholder="*📦 NUEVO PEDIDO — {tienda}*&#10;*Cliente:* {cliente}&#10;{pago}----------------------------&#10;{lista}----------------------------&#10;*TOTAL ESTIMADO: {total}*"></textarea></div>
@@ -332,6 +308,11 @@
                     <div class="form-group">
                         <label>Código del mapa (Google Maps → Compartir → Insertar un mapa → Copiar HTML)</label>
                         <textarea id="cfgMapaIframe" rows="4" placeholder='&lt;iframe src="https://www.google.com/maps/embed?pb=..." width="600" height="450"&gt;&lt;/iframe&gt;'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>O una foto del local (URL de imagen)</label>
+                        <input id="cfgMapaImagen" placeholder="https://i.postimg.cc/...">
+                        <p class="admin-help">Si cargás una foto, se muestra ésta en vez del mapa de Google — útil cuando el mapa no carga bien o preferís mostrar la fachada. Si además pegaste el mapa arriba, la foto queda clickeable y abre el mapa.</p>
                     </div>
                 </div>
             </div>
@@ -438,7 +419,7 @@
                 <div class="admin-form-box">
                     <h4 style="margin-top:0; opacity:0.7;">Medios de pago aceptados</h4>
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
-                        <input type="checkbox" id="cfgPagoEfectivo" style="width:20px; height:20px;"> Efectivo / Contra entrega
+                        <input type="checkbox" id="cfgPagoEfectivo" style="width:20px; height:20px;"> Efectivo
                     </label>
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
                         <input type="checkbox" id="cfgPagoTransferencia" style="width:20px; height:20px;"> Transferencia bancaria
@@ -452,6 +433,16 @@
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
                         <input type="checkbox" id="cfgPagoMercadoPago" style="width:20px; height:20px;"> Mercado Pago
                     </label>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">🚚 Envíos</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:6px; cursor:pointer; font-weight:700;">
+                        <input type="checkbox" id="cfgEnviosActivo" style="width:20px; height:20px;"> Ofrecer envío a domicilio
+                    </label>
+                    <p class="admin-help">Si lo activás, el cliente elige en el carrito entre "Retiro en el local" y "Envío a domicilio", y esa elección se incluye en el pedido de WhatsApp.</p>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Información del envío (opcional)</label>
+                        <textarea id="cfgEnviosInfo" rows="3" placeholder="Ej: Envíos dentro de la ciudad $2000. Gratis en compras mayores a $30.000. Entrega en 24/48 hs."></textarea>
+                    </div>
                 </div>
             </div>
 
@@ -604,11 +595,18 @@
                 <span style="font-size:18px; opacity:0.7;">Total Estimado:</span>
                 <span id="cartTotal" style="font-size:32px; font-weight:800; color:var(--accent);">$0</span>
             </div>
+            <div id="entregaContainer" style="display:none; margin-bottom:20px;">
+                <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Forma de entrega</label>
+                <select id="entregaSelect" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;">
+                    <option value="retiro">Retiro en el local</option>
+                    <option value="envio">Envío a domicilio</option>
+                </select>
+                <p id="entregaInfo" style="display:none; font-size:12px; opacity:0.7; margin-top:8px; line-height:1.5;"></p>
+            </div>
             <div id="metodoPagoContainer" style="display:none; margin-bottom:20px;">
                 <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Método de pago</label>
                 <select id="metodoPagoSelect" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;"></select>
             </div>
-            <div id="avisoHorario" style="display:none; margin-bottom:16px; padding:14px; border-radius:14px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); color:#f59e0b; font-size:13px; font-weight:700; text-align:center;"></div>
             <button id="btnFinalizarPedido" class="btn-add" style="background:#25d366; padding:22px; font-size:16px;" onclick="finalizarYEnviar()">ENVIAR PEDIDO POR WHATSAPP 🚀</button>
         </div>
     </div>
