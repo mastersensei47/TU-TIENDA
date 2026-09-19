@@ -182,8 +182,10 @@
         <div class="form-group"><label id="lblCampoTrabajo">Problema / trabajo realizado</label><textarea id="rProblema" rows="2" placeholder="Detalle del trabajo a realizar"></textarea></div>
 
         <div class="form-group">
-            <label>Repuestos / materiales usados (opcional) — uno por línea: Nombre | Costo</label>
-            <textarea id="rRepuestos" rows="3" placeholder="Repuesto o material | 15000&#10;Otro insumo | 8000"></textarea>
+            <label>Repuestos / materiales usados (opcional)</label>
+            <p style="opacity:0.55; font-size:11px; margin:6px 0 10px; line-height:1.45;">Una fila por repuesto: nombre + costo. Agregá o quitá las filas que necesites.</p>
+            <div id="repuestosLista" class="download-links-list"></div>
+            <button type="button" class="btn-add download-link-add-btn" onclick="agregarRepuesto()">+ Agregar repuesto</button>
         </div>
 
         <div class="form-group"><label>Costo de mano de obra</label><input id="rManoObra" type="number" placeholder="0"></div>
