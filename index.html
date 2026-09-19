@@ -8,6 +8,18 @@
     <meta name="application-name" content="Tienda">
     <title>Tienda</title>
 
+    <meta name="description" content="Catálogo online — mirá productos, precios y hacé tu pedido por WhatsApp.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Tienda Online">
+    <meta property="og:title" content="Tienda">
+    <meta property="og:description" content="Catálogo online — mirá productos, precios y hacé tu pedido por WhatsApp.">
+    <meta property="og:image" content="icon-512.png">
+    <meta property="og:url" content="">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Tienda">
+    <meta name="twitter:description" content="Catálogo online — mirá productos, precios y hacé tu pedido por WhatsApp.">
+    <meta name="twitter:image" content="icon-512.png">
+
     <link rel="manifest" href="manifest-tienda.json">
     <meta name="theme-color" content="#3b82f6">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -161,7 +173,6 @@
             <button class="tab-btn" onclick="tab('t-stats', event)">ESTADÍSTICAS</button>
             <button class="tab-btn" onclick="tab('t-slider', event)">SLIDER HERO</button>
             <button class="tab-btn" onclick="tab('t-config', event)">CONFIGURACIÓN</button>
-            <button class="tab-btn" onclick="tab('t-layout', event)">DISEÑO</button>
         </div>
 
         <div id="t-prod">
@@ -171,7 +182,16 @@
                 <div class="form-group"><label>Precio Normal ($)</label><input id="fPre" type="number"></div>
                 <div class="form-group precio-mayorista-field"><label>Precio Mayorista ($)</label><input id="fPreMay" type="number"></div>
                 <div class="form-group"><label>Stock disponible</label><input id="fStock" type="number" min="0" value="10"></div>
-                <div class="form-group"><label>Oferta Especial</label><input id="fPro"></div>
+                <div class="form-group"><label>Oferta Especial (texto libre, ej: "2x1")</label><input id="fPro"></div>
+                <div class="form-group">
+                    <label>Etiquetas rápidas</label>
+                    <div style="display:flex; flex-wrap:wrap; gap:10px 20px;">
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500; font-size:14px;"><input id="fDestacado" type="checkbox" style="width:18px; height:18px;"> ⭐ Destacado</label>
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500; font-size:14px;"><input id="fNuevo" type="checkbox" style="width:18px; height:18px;"> 🆕 Nuevo</label>
+                        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:500; font-size:14px;"><input id="fSinStock" type="checkbox" style="width:18px; height:18px;"> 🚫 Sin stock (forzado)</label>
+                    </div>
+                    <p class="admin-help">"Sin stock (forzado)" marca el producto como agotado aunque el número de stock diga otra cosa — útil si lo sacás de circulación un tiempo sin borrar el stock cargado.</p>
+                </div>
                 <div class="form-group"><label>Categoría</label><select id="fCat"></select></div>
                 <div class="form-group variantes-field">
                     <label>Variantes (opcional) — una por línea: Nombre | Stock</label>
@@ -236,53 +256,200 @@
         </div>
 
         <div id="t-config" style="display:none;">
-            <div class="admin-form-box">
-                <h4 style="margin-top:0; opacity:0.7;">Datos generales y de contacto</h4>
-                <div class="form-group"><label>Nombre de la tienda</label><input id="cfgStoreName" placeholder="Ej: Mundo Tic"></div>
-                <div class="form-group">
-                    <label>¿A qué público apunta la tienda?</label>
-                    <select id="cfgBusinessMode">
-                        <option value="ambos">Mayorista y minorista</option>
-                        <option value="mayorista">Solo mayorista</option>
-                        <option value="minorista">Solo minorista</option>
-                    </select>
+            <div class="admin-subtabs">
+                <button class="subtab-btn active" onclick="subtab('general', event)">General</button>
+                <button class="subtab-btn" onclick="subtab('apariencia', event)">Apariencia</button>
+                <button class="subtab-btn" onclick="subtab('catalogo', event)">Catálogo</button>
+                <button class="subtab-btn" onclick="subtab('pagos', event)">Medios de pago</button>
+                <button class="subtab-btn" onclick="subtab('pwa', event)">PWA</button>
+            </div>
+
+            <div id="subtab-general" class="admin-subtab-panel">
+                <div class="admin-form-box">
+                    <h4 style="margin-top:0; opacity:0.7;">Datos generales y de contacto</h4>
+                    <div class="form-group"><label>Nombre de la tienda</label><input id="cfgStoreName" placeholder="Ej: Mundo Tic"></div>
+                    <div class="form-group">
+                        <label>¿A qué público apunta la tienda?</label>
+                        <select id="cfgBusinessMode">
+                            <option value="ambos">Mayorista y minorista</option>
+                            <option value="mayorista">Solo mayorista</option>
+                            <option value="minorista">Solo minorista</option>
+                        </select>
+                    </div>
+                    <p style="opacity:0.5; font-size:12px; margin-top:-10px;">"Solo minorista" oculta por completo el precio mayorista, para que nadie vea nada relacionado. El registro de cuentas de cliente queda disponible igual, para el historial de pedidos.</p>
+                    <div class="form-group"><label>WhatsApp para pedidos (con código de país)</label><input id="cfgWhatsapp" placeholder="5493424123456"></div>
+                    <div class="form-group"><label>Dirección del local</label><input id="cfgAddress" placeholder="Av. Facundo Zuviría 4500"></div>
+                    <div class="form-group"><label>Horarios de atención (texto que se muestra)</label><input id="cfgHorarios" placeholder="Lun a Vie 8 a 18 hs"></div>
+                    <div class="form-group"><label>Instagram (URL completa)</label><input id="cfgInstagram" placeholder="https://instagram.com/tuusuario"></div>
+                    <div class="form-group"><label>Facebook (URL completa)</label><input id="cfgFacebook" placeholder="https://facebook.com/tupagina"></div>
+                    <div class="form-group"><label>TikTok (URL completa)</label><input id="cfgTiktok" placeholder="https://tiktok.com/@tuusuario"></div>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">⏰ Control automático de horario</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:4px; cursor:pointer; font-weight:700;">
+                        <input type="checkbox" id="cfgHorarioActivo" style="width:20px; height:20px;"> Activar control de horario de atención
+                    </label>
+                    <p class="admin-help">Fuera de estos días/horarios se muestra un aviso en el carrito. Esto es aparte del texto de "Horarios de atención" de arriba (que es solo informativo).</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:8px 16px; margin:14px 0;">
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia0"> Dom</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia1"> Lun</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia2"> Mar</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia3"> Mié</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia4"> Jue</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia5"> Vie</label>
+                        <label style="display:flex; align-items:center; gap:5px; font-size:13px; cursor:pointer;"><input type="checkbox" id="cfgHorarioDia6"> Sáb</label>
+                    </div>
+                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:140px;"><label>Desde</label><input id="cfgHorarioDesde" type="time"></div>
+                        <div class="form-group" style="flex:1; min-width:140px;"><label>Hasta</label><input id="cfgHorarioHasta" type="time"></div>
+                    </div>
+                    <div class="form-group"><label>Mensaje fuera de horario</label><input id="cfgHorarioMensaje" placeholder="Ej: Fuera de horario de atención, tu pedido será procesado mañana."></div>
+                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" id="cfgHorarioBloquear" style="width:20px; height:20px;"> Bloquear el envío de pedidos fuera de horario (si no, solo se avisa y se puede pedir igual)
+                    </label>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">💬 Mensaje de WhatsApp</h4>
+                    <p class="admin-help">Plantilla del texto que se manda por WhatsApp al confirmar un pedido. Dejalo vacío para usar el formato de siempre. Placeholders disponibles: <code>{tienda}</code> <code>{cliente}</code> <code>{pago}</code> <code>{lista}</code> <code>{total}</code></p>
+                    <div class="form-group"><textarea id="cfgWhatsappTemplate" rows="6" placeholder="*📦 NUEVO PEDIDO — {tienda}*&#10;*Cliente:* {cliente}&#10;{pago}----------------------------&#10;{lista}----------------------------&#10;*TOTAL ESTIMADO: {total}*"></textarea></div>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">Estado de la tienda</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgPausada" style="width:20px; height:20px;"> Pausar tienda (vacaciones / mantenimiento)
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:10px; cursor:pointer;">
+                        <input type="checkbox" id="cfgBannerActivo" style="width:20px; height:20px;"> Mostrar banner de aviso arriba de todo
+                    </label>
+                    <div class="form-group"><input id="cfgBannerTexto" placeholder="Ej: ¡ENVÍOS GRATIS comprando más de $20.000!"></div>
+                    <div class="form-group"><label>Color de fondo del banner</label><input id="cfgBannerBg" type="color" style="height:50px; padding:5px; cursor:pointer;"></div>
+                    <div class="form-group"><label>Color del texto del banner</label><input id="cfgBannerColor" type="color" style="height:50px; padding:5px; cursor:pointer;"></div>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">Mapa</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgMostrarMapa" style="width:20px; height:20px;"> Mostrar mapa de ubicación
+                    </label>
+                    <div class="form-group">
+                        <label>Código del mapa (Google Maps → Compartir → Insertar un mapa → Copiar HTML)</label>
+                        <textarea id="cfgMapaIframe" rows="4" placeholder='&lt;iframe src="https://www.google.com/maps/embed?pb=..." width="600" height="450"&gt;&lt;/iframe&gt;'></textarea>
+                    </div>
                 </div>
-                <p style="opacity:0.5; font-size:12px; margin-top:-10px;">"Solo minorista" oculta por completo el registro de clientes mayoristas y el precio mayorista, para que nadie vea nada relacionado.</p>
-                <div class="form-group"><label>WhatsApp para pedidos (con código de país)</label><input id="cfgWhatsapp" placeholder="5493424123456"></div>
-                <div class="form-group"><label>Dirección del local</label><input id="cfgAddress" placeholder="Av. Facundo Zuviría 4500"></div>
-                <div class="form-group"><label>Horarios de atención</label><input id="cfgHorarios" placeholder="Lun a Vie 8 a 18 hs"></div>
-                <div class="form-group"><label>Instagram (URL completa)</label><input id="cfgInstagram" placeholder="https://instagram.com/tuusuario"></div>
-                <div class="form-group"><label>Facebook (URL completa)</label><input id="cfgFacebook" placeholder="https://facebook.com/tupagina"></div>
-                <div class="form-group"><label>TikTok (URL completa)</label><input id="cfgTiktok" placeholder="https://tiktok.com/@tuusuario"></div>
+            </div>
 
-                <h4 style="margin-top:30px; opacity:0.7;">Estado de la tienda</h4>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgPausada" style="width:20px; height:20px;"> Pausar tienda (vacaciones / mantenimiento)
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:10px; cursor:pointer;">
-                    <input type="checkbox" id="cfgBannerActivo" style="width:20px; height:20px;"> Mostrar banner de aviso arriba de todo
-                </label>
-                <div class="form-group"><input id="cfgBannerTexto" placeholder="Ej: ¡ENVÍOS GRATIS comprando más de $20.000!"></div>
-                <div class="form-group"><label>Color de fondo del banner</label><input id="cfgBannerBg" type="color" style="height:50px; padding:5px; cursor:pointer;"></div>
-                <div class="form-group"><label>Color del texto del banner</label><input id="cfgBannerColor" type="color" style="height:50px; padding:5px; cursor:pointer;"></div>
+            <div id="subtab-apariencia" class="admin-subtab-panel" style="display:none;">
+                <div class="admin-form-box">
+                    <h4 style="margin-top:0; opacity:0.7;">Logo y colores</h4>
+                    <div class="form-group"><label>URL del logo (vacío = se muestra el nombre en texto)</label><input id="cfgLogoUrl" placeholder="https://..."></div>
+                    <div class="form-group">
+                        <label>Tema rápido (opcional — pisa los colores de abajo, con vista previa al instante)</label>
+                        <select id="cfgThemePreset" onchange="aplicarPresetTema()">
+                            <option value="">— Elegir un tema... —</option>
+                            <option value="oscuro">Tema Oscuro</option>
+                            <option value="claro">Tema Claro</option>
+                            <option value="neon">Gaming / Neón</option>
+                            <option value="elegante">Elegante / Minimalista</option>
+                            <option value="cyberpunk">Cyberpunk</option>
+                            <option value="deportivo">Rojiblanco / Deportivo</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Color principal (accent)</label><input id="cfgAccent" type="color" style="height:50px; padding:5px; cursor:pointer;" oninput="previsualizarColor('--accent', this.value)"></div>
+                    <div class="form-group"><label>Color de fondo</label><input id="cfgBg" type="color" style="height:50px; padding:5px; cursor:pointer;" oninput="previsualizarColor('--bg', this.value)"></div>
+                    <div class="form-group">
+                        <label>Bordes de las tarjetas de producto</label>
+                        <select id="cfgRadius" onchange="previsualizarColor('--radius', this.value)">
+                            <option value="0px">Rectos</option>
+                            <option value="8px">Redondeados</option>
+                            <option value="20px">Muy redondeados (pill)</option>
+                        </select>
+                    </div>
+                    <p style="opacity:0.5; font-size:12px; margin-top:-10px;">Los colores y bordes se ven al instante como vista previa — recién quedan guardados de verdad al tocar "GUARDAR CONFIGURACIÓN" más abajo.</p>
 
-                <h4 style="margin-top:30px; opacity:0.7;">Medios de pago aceptados</h4>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
-                    <input type="checkbox" id="cfgPagoEfectivo" style="width:20px; height:20px;"> Efectivo / Contra entrega
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
-                    <input type="checkbox" id="cfgPagoTransferencia" style="width:20px; height:20px;"> Transferencia bancaria
-                </label>
-                <div class="form-group"><label>Datos para transferir (CBU / Alias / Titular)</label><textarea id="cfgDatosTransferencia" rows="3" placeholder="CBU: ...&#10;Alias: ...&#10;Titular: ..."></textarea></div>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgPagoMercadoPago" style="width:20px; height:20px;"> Mercado Pago
-                </label>
+                    <h4 style="margin-top:30px; opacity:0.7;">Secciones</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgMostrarHero" style="width:20px; height:20px;"> Mostrar carrusel de imágenes (Hero)
+                    </label>
 
-                <h4 style="margin-top:30px; opacity:0.7;">Experiencia visual</h4>
-                <div class="form-group"><label>URL del logo (vacío = se muestra el nombre en texto)</label><input id="cfgLogoUrl" placeholder="https://..."></div>
+                    <h4 style="margin-top:30px; opacity:0.7;">Menú superior</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgHeaderSticky" style="width:20px; height:20px;"> Header fijo al hacer scroll (sticky)
+                    </label>
+                    <div class="form-group">
+                        <label>Estilo del menú</label>
+                        <select id="cfgHeaderStyle">
+                            <option value="floating">Flotante moderno (bordes redondeados)</option>
+                            <option value="bar">Barra completa tradicional</option>
+                        </select>
+                    </div>
 
-                <h4 style="margin-top:30px; opacity:0.7;">📲 Instalación como app</h4>
-                <div class="admin-form-box" style="margin-bottom:22px;">
+                    <h4 style="margin-top:30px; opacity:0.7;">Carrito</h4>
+                    <div class="form-group">
+                        <label>Animación al agregar al carrito</label>
+                        <select id="cfgAddToCartAnim">
+                            <option value="banner">Cartel emergente (clásico)</option>
+                            <option value="shake">Sacudida del ícono del carrito</option>
+                            <option value="fly">Volar la imagen hasta el carrito</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cómo se abre el carrito</label>
+                        <select id="cfgCartStyle">
+                            <option value="drawer">Panel lateral (drawer)</option>
+                            <option value="modal">Ventana emergente centrada (modal)</option>
+                        </select>
+                    </div>
+                    <p style="opacity:0.5; font-size:12px;">¿Página de checkout dedicada en vez de carrito? Es un cambio más grande — avisame si te interesa y lo armamos aparte.</p>
+                </div>
+            </div>
+
+            <div id="subtab-catalogo" class="admin-subtab-panel" style="display:none;">
+                <div class="admin-form-box">
+                    <h4 style="margin-top:0; opacity:0.7;">Catálogo</h4>
+                    <div class="form-group">
+                        <label>Vista del catálogo (en celulares)</label>
+                        <select id="cfgCatalogView">
+                            <option value="grid2">Grilla de 2 columnas</option>
+                            <option value="grid1">Columna única (tarjetas grandes)</option>
+                            <option value="list">Lista compacta (modo mayorista)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Efecto en las fotos del catálogo</label>
+                        <select id="cfgImageEffect">
+                            <option value="none">Sin filtro</option>
+                            <option value="zoom">Zoom al pasar el mouse</option>
+                            <option value="gradient">Degradé en las esquinas</option>
+                        </select>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgGlowEffect" style="width:20px; height:20px;"> Efecto de brillo/glow tipo neón en las tarjetas
+                    </label>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">Categorías</h4>
+                    <div id="categoriasEditor"></div>
+                    <div style="display:flex; gap:8px; margin-top:12px;">
+                        <input id="catNuevoIcono" placeholder="🔧" style="width:60px; flex:none;">
+                        <input id="catNuevoLabel" placeholder="Nombre de la categoría nueva" style="flex:1;">
+                        <button onclick="agregarCategoriaEditor()" style="background:var(--accent); color:white; border:none; padding:0 18px; border-radius:12px; font-weight:700; cursor:pointer;">+ Agregar</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="subtab-pagos" class="admin-subtab-panel" style="display:none;">
+                <div class="admin-form-box">
+                    <h4 style="margin-top:0; opacity:0.7;">Medios de pago aceptados</h4>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
+                        <input type="checkbox" id="cfgPagoEfectivo" style="width:20px; height:20px;"> Efectivo / Contra entrega
+                    </label>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:12px; cursor:pointer;">
+                        <input type="checkbox" id="cfgPagoTransferencia" style="width:20px; height:20px;"> Transferencia bancaria
+                    </label>
+                    <div class="form-group"><label>Datos para transferir (CBU / Alias / Titular)</label><textarea id="cfgDatosTransferencia" rows="3" placeholder="CBU: ...&#10;Alias: ...&#10;Titular: ..."></textarea></div>
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
+                        <input type="checkbox" id="cfgPagoMercadoPago" style="width:20px; height:20px;"> Mercado Pago
+                    </label>
+                </div>
+            </div>
+
+            <div id="subtab-pwa" class="admin-subtab-panel" style="display:none;">
+                <div class="admin-form-box">
+                    <h4 style="margin-top:0; opacity:0.7;">📲 Instalación como app</h4>
                     <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-weight:700; margin-bottom:4px;">
                         <input id="cfgPwaEnabled" type="checkbox" style="width:18px; height:18px;">
                         Permitir instalar la tienda como app
@@ -294,118 +461,18 @@
                         <input id="cfgPwaAppName" placeholder="Vacío = se usa el nombre de la tienda">
                         <p class="admin-help">Es el nombre corto que aparece debajo del ícono en el celu/escritorio. Conviene algo cortito — el nombre completo de la tienda a veces no entra.</p>
                     </div>
-                    <div class="form-group" style="margin-bottom:0;">
+                    <div class="form-group">
                         <label>Ícono de la app al instalarla</label>
                         <input id="cfgPwaIconUrl" placeholder="https://... (vacío = ícono genérico)">
                         <p class="admin-help">Usá una imagen cuadrada (ideal 512x512). No tiene por qué ser el mismo que el logo.</p>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Tema rápido (opcional — pisa los colores de abajo, con vista previa al instante)</label>
-                    <select id="cfgThemePreset" onchange="aplicarPresetTema()">
-                        <option value="">— Elegir un tema... —</option>
-                        <option value="oscuro">Tema Oscuro</option>
-                        <option value="claro">Tema Claro</option>
-                        <option value="neon">Gaming / Neón</option>
-                        <option value="elegante">Elegante / Minimalista</option>
-                        <option value="cyberpunk">Cyberpunk</option>
-                        <option value="deportivo">Rojiblanco / Deportivo</option>
-                    </select>
-                </div>
-                <div class="form-group"><label>Color principal (accent)</label><input id="cfgAccent" type="color" style="height:50px; padding:5px; cursor:pointer;" oninput="previsualizarColor('--accent', this.value)"></div>
-                <div class="form-group"><label>Color de fondo</label><input id="cfgBg" type="color" style="height:50px; padding:5px; cursor:pointer;" oninput="previsualizarColor('--bg', this.value)"></div>
-                <div class="form-group">
-                    <label>Bordes de las tarjetas de producto</label>
-                    <select id="cfgRadius" onchange="previsualizarColor('--radius', this.value)">
-                        <option value="0px">Rectos</option>
-                        <option value="8px">Redondeados</option>
-                        <option value="20px">Muy redondeados (pill)</option>
-                    </select>
-                </div>
-                <p style="opacity:0.5; font-size:12px; margin-top:-10px;">Los colores y bordes se ven al instante como vista previa — recién quedan guardados de verdad al tocar "GUARDAR CONFIGURACIÓN" más abajo.</p>
-
-                <h4 style="margin-top:30px; opacity:0.7;">Secciones</h4>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgMostrarHero" style="width:20px; height:20px;"> Mostrar carrusel de imágenes (Hero)
-                </label>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgMostrarMapa" style="width:20px; height:20px;"> Mostrar mapa de ubicación
-                </label>
-
-                <div class="form-group">
-                    <label>Código del mapa (Google Maps → Compartir → Insertar un mapa → Copiar HTML)</label>
-                    <textarea id="cfgMapaIframe" rows="4" placeholder='&lt;iframe src="https://www.google.com/maps/embed?pb=..." width="600" height="450"&gt;&lt;/iframe&gt;'></textarea>
-                </div>
-
-                <h4 style="margin-top:30px; opacity:0.7;">Categorías</h4>
-                <div id="categoriasEditor"></div>
-                <div style="display:flex; gap:8px; margin-top:12px; margin-bottom:20px;">
-                    <input id="catNuevoIcono" placeholder="🔧" style="width:60px; flex:none;">
-                    <input id="catNuevoLabel" placeholder="Nombre de la categoría nueva" style="flex:1;">
-                    <button onclick="agregarCategoriaEditor()" style="background:var(--accent); color:white; border:none; padding:0 18px; border-radius:12px; font-weight:700; cursor:pointer;">+ Agregar</button>
-                </div>
-
-                <button class="btn-add" style="background:var(--success)" onclick="guardarConfigTienda()">GUARDAR CONFIGURACIÓN</button>
             </div>
-        </div>
 
-        <div id="t-layout" style="display:none;">
-            <div class="admin-form-box">
-                <h4 style="margin-top:0; opacity:0.7;">Catálogo</h4>
-                <div class="form-group">
-                    <label>Vista del catálogo (en celulares)</label>
-                    <select id="cfgCatalogView">
-                        <option value="grid2">Grilla de 2 columnas</option>
-                        <option value="grid1">Columna única (tarjetas grandes)</option>
-                        <option value="list">Lista compacta (modo mayorista)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Efecto en las fotos del catálogo</label>
-                    <select id="cfgImageEffect">
-                        <option value="none">Sin filtro</option>
-                        <option value="zoom">Zoom al pasar el mouse</option>
-                        <option value="gradient">Degradé en las esquinas</option>
-                    </select>
-                </div>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgGlowEffect" style="width:20px; height:20px;"> Efecto de brillo/glow tipo neón en las tarjetas
-                </label>
-
-                <h4 style="margin-top:30px; opacity:0.7;">Menú superior</h4>
-                <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
-                    <input type="checkbox" id="cfgHeaderSticky" style="width:20px; height:20px;"> Header fijo al hacer scroll (sticky)
-                </label>
-                <div class="form-group">
-                    <label>Estilo del menú</label>
-                    <select id="cfgHeaderStyle">
-                        <option value="floating">Flotante moderno (bordes redondeados)</option>
-                        <option value="bar">Barra completa tradicional</option>
-                    </select>
-                </div>
-
-                <h4 style="margin-top:30px; opacity:0.7;">Carrito</h4>
-                <div class="form-group">
-                    <label>Animación al agregar al carrito</label>
-                    <select id="cfgAddToCartAnim">
-                        <option value="banner">Cartel emergente (clásico)</option>
-                        <option value="shake">Sacudida del ícono del carrito</option>
-                        <option value="fly">Volar la imagen hasta el carrito</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Cómo se abre el carrito</label>
-                    <select id="cfgCartStyle">
-                        <option value="drawer">Panel lateral (drawer)</option>
-                        <option value="modal">Ventana emergente centrada (modal)</option>
-                    </select>
-                </div>
-                <p style="opacity:0.5; font-size:12px;">¿Página de checkout dedicada en vez de carrito? Es un cambio más grande — avisame si te interesa y lo armamos aparte.</p>
-
-                <button class="btn-add" style="background:var(--success)" onclick="guardarConfigTienda()">GUARDAR CONFIGURACIÓN</button>
-            </div>
+            <button class="btn-add" style="background:var(--success); margin-top:10px;" onclick="guardarConfigTienda()">GUARDAR CONFIGURACIÓN</button>
         </div>
     </div>
+
 </div>
 
 <div class="modal" id="loginModal">
@@ -533,7 +600,8 @@
                 <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Método de pago</label>
                 <select id="metodoPagoSelect" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;"></select>
             </div>
-            <button class="btn-add" style="background:#25d366; padding:22px; font-size:16px;" onclick="finalizarYEnviar()">ENVIAR PEDIDO POR WHATSAPP 🚀</button>
+            <div id="avisoHorario" style="display:none; margin-bottom:16px; padding:14px; border-radius:14px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); color:#f59e0b; font-size:13px; font-weight:700; text-align:center;"></div>
+            <button id="btnFinalizarPedido" class="btn-add" style="background:#25d366; padding:22px; font-size:16px;" onclick="finalizarYEnviar()">ENVIAR PEDIDO POR WHATSAPP 🚀</button>
         </div>
     </div>
 </div>
