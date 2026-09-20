@@ -249,9 +249,34 @@
             <div class="admin-form-box">
                 <div class="form-group">
                     <label>URL de imagen del slider — cualquier formato sirve</label>
-                    <input id="sliderUrl" placeholder="https://...">
+                    <input id="sliderUrl" placeholder="https://..." oninput="previsualizarHero(this.value)">
                     <a href="https://postimg.cc/" target="_blank" style="display:inline-block; margin-top:8px; background:var(--accent); color:white; padding:8px 16px; border-radius:10px; text-decoration:none; font-size:13px; font-weight:700;">📤 Subir imagen aquí</a>
                 </div>
+
+                <div id="heroPreviewBox" style="display:none; margin:22px 0;">
+                    <p style="font-size:11px; opacity:0.55; margin:0 0 14px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Vista previa — así se recorta la imagen en cada pantalla</p>
+                    <div style="display:flex; gap:26px; flex-wrap:wrap; align-items:flex-end;">
+                        <div>
+                            <div style="background:#1e293b; border-radius:10px 10px 0 0; padding:8px 10px; display:flex; gap:5px;">
+                                <span style="width:9px; height:9px; border-radius:50%; background:#ef4444; display:inline-block;"></span>
+                                <span style="width:9px; height:9px; border-radius:50%; background:#f59e0b; display:inline-block;"></span>
+                                <span style="width:9px; height:9px; border-radius:50%; background:#10b981; display:inline-block;"></span>
+                            </div>
+                            <div id="heroPreviewPC" style="width:420px; max-width:100%; height:122px; background:#000 center/cover no-repeat; border-radius:0 0 10px 10px; border:1px solid rgba(255,255,255,0.1); border-top:none;"></div>
+                            <p style="text-align:center; font-size:11px; opacity:0.5; margin-top:6px;">🖥️ PC / notebook</p>
+                        </div>
+                        <div>
+                            <div style="width:130px; background:#1e293b; border-radius:16px 16px 0 0; padding-top:10px; display:flex; justify-content:center;">
+                                <span style="width:34px; height:5px; border-radius:3px; background:#334155; display:inline-block;"></span>
+                            </div>
+                            <div id="heroPreviewMobile" style="width:130px; height:93px; background:#000 center/cover no-repeat; border:1px solid rgba(255,255,255,0.1); border-top:none; border-bottom:none;"></div>
+                            <div style="width:130px; height:10px; background:#1e293b; border-radius:0 0 16px 16px;"></div>
+                            <p style="text-align:center; font-size:11px; opacity:0.5; margin-top:6px;">📱 Celular</p>
+                        </div>
+                    </div>
+                    <p class="admin-help" style="margin-top:14px;">Es una simulación (la pantalla real de cada visitante puede ser más ancha o angosta) — pero sirve para ver qué parte de la imagen queda cortada arriba/abajo en cada caso antes de subirla. Usá imágenes bien anchas (mínimo 1600px) con lo importante centrado, para que se vea bien en ambas.</p>
+                </div>
+
                 <button class="btn-add" style="background:var(--success)" onclick="addHeroImage()">AGREGAR AL SLIDER</button>
             </div>
             <div id="admListSlider"></div>
@@ -492,7 +517,7 @@
     <div class="modal-content" style="max-width:480px; margin: 40px auto; padding: 30px;">
         <h2 id="regTitulo" style="text-align:center; margin-bottom:5px;">Nueva Solicitud</h2>
         <p id="regSubtitulo" style="text-align:center; opacity:0.5; font-size:13px; margin-bottom:25px;">Completá los datos de tu comercio</p>
-        <div class="form-group"><label>Nombre de Usuario</label><input id="rU" placeholder="Ej: Kiosco_SantaFe (sin espacios)"></div>
+        <div class="form-group"><label>Nombre de Usuario</label><input id="rU" placeholder="Ej: usuario_2024 (sin espacios)"></div>
         <div class="form-group"><label>Contraseña Deseada</label><input id="rP" type="password" placeholder="Mínimo 6 caracteres"></div>
         <div class="form-group"><label>WhatsApp de Contacto</label><input id="rT" placeholder="Ej: 3424123456"></div>
         <div class="form-group" id="regDireccionGroup"><label>Información del Local</label><textarea id="rD" placeholder="Nombre del negocio, calle y altura..."></textarea></div>
