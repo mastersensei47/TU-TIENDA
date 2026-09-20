@@ -2064,12 +2064,27 @@ function renderAdmSlider() {
         return;
     }
     list.innerHTML = heroImages.map(h => `
-        <div class="admin-item">
+        <div class="admin-item" style="cursor:pointer;" onclick="previsualizarHero('${h.url.replace(/'/g, "\\'")}')" title="Tocar para previsualizar">
             <img src="${h.url}" class="admin-item-img" alt="slide" loading="lazy">
             <div style="flex:1;"><b>Imagen ${h.order + 1}</b></div>
-            <button onclick="deleteHeroImage('${h.id}')" style="color:var(--danger); font-size:18px; cursor:pointer; background:none; border:none;">🗑️</button>
+            <button onclick="event.stopPropagation(); deleteHeroImage('${h.id}')" style="color:var(--danger); font-size:18px; cursor:pointer; background:none; border:none;">🗑️</button>
         </div>
     `).join("");
+}
+
+// Vista previa tipo "banner de YouTube": muestra cómo queda recortada la
+// imagen en una pantalla de PC (banner ancho y bajo) y en un celular
+// (más angosto), ya que el hero usa background-size:cover en las dos.
+function previsualizarHero(url) {
+    const box = document.getElementById("heroPreviewBox");
+    const pc = document.getElementById("heroPreviewPC");
+    const mobile = document.getElementById("heroPreviewMobile");
+    if (!box || !pc || !mobile) return;
+    url = (url || "").trim();
+    if (!url) { box.style.display = "none"; return; }
+    pc.style.backgroundImage = `url('${url}')`;
+    mobile.style.backgroundImage = `url('${url}')`;
+    box.style.display = "block";
 }
 
 async function addHeroImage() {
@@ -2078,6 +2093,7 @@ async function addHeroImage() {
     const order = heroImages.length;
     await db.collection("hero").add({ url: url, order: order });
     document.getElementById("sliderUrl").value = "";
+    document.getElementById("heroPreviewBox").style.display = "none";
     alert("Imagen agregada al slider");
 }
 
