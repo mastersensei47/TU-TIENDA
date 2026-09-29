@@ -16,7 +16,7 @@
 // el sistema: es el mismo para todos los clientes, porque apunta al
 // proyecto "directorio", no a ningún cliente en particular.
 
-let db, auth, storage, STORE_CONFIG;
+let db, auth, STORE_CONFIG;
 let clienteApp, masterApp;
 
 function leerSlug() {
@@ -199,10 +199,8 @@ async function bootstrap() {
             clienteApp = await obtenerFirebaseApp("cliente", firebaseConfig);
             db = crearFirestore(clienteApp);
             auth = firebase.auth(clienteApp);
-            // Storage es opcional: si el negocio no lo habilitó en su Firebase
-            // (paso extra en la consola), esto no rompe nada — la función que
-            // sube el comprobante simplemente avisa que no está disponible.
-            try { storage = firebase.storage(clienteApp); } catch (_) { storage = null; }
+            // Los comprobantes de transferencia se suben a Cloudinary (no a
+            // Firebase Storage), así que no hace falta inicializar Storage.
         } catch (e) {
             return mostrarErrorSlug(errorFirebaseDetalle(e, `CLIENTE / ${firebaseConfig.projectId}`));
         }
@@ -2701,18 +2699,23 @@ function actualizarVisibilidadComprobante() {
 }
 
 // ==================== COMPROBANTE DE TRANSFERENCIA ====================
-// Sube la imagen a Firebase Storage (si el negocio lo tiene habilitado) y
-// guarda la URL para adjuntarla al pedido. Como WhatsApp no deja mandar
-// una imagen dentro de un link de "click to chat", el mensaje incluye el
-// link al comprobante en vez de la imagen en sí — al tocarlo, el dueño la
-// ve directo.
+// Sube la imagen a Cloudinary (upload preset "unsigned", sin API secret en
+// el navegador) y guarda la URL segura para adjuntarla al pedido, tanto en
+// Firestore (campo comprobanteUrl) como en el mensaje de WhatsApp. Como
+// WhatsApp no deja mandar una imagen dentro de un link de "click to chat",
+// el mensaje incluye el link al comprobante: al tocarlo, el dueño la ve.
+const CLOUDINARY_CLOUD_NAME = "fe1xog5q";
+const CLOUDINARY_UPLOAD_PRESET = "vktq9pvm";
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
 let comprobanteURL = null;
+let subiendoComprobante = false;
 
 async function subirComprobante(file) {
     const estado = document.getElementById("comprobanteEstado");
-    if (!file) return;
-    if (!storage) {
-        if (estado) estado.innerText = "⚠️ Esta tienda todavía no tiene la subida de comprobantes habilitada.";
+    comprobanteURL = null;
+    if (!file) {
+        if (estado) estado.innerText = "";
         return;
     }
     if (!file.type.startsWith("image/")) {
@@ -2724,16 +2727,28 @@ async function subirComprobante(file) {
         return;
     }
     if (estado) estado.innerText = "⏳ Subiendo...";
+    subiendoComprobante = true;
     try {
-        const nombreArchivo = `comprobantes/${STORE_CONFIG.storeId}/${Date.now()}_${file.name}`.replace(/\s+/g, "_");
-        const ref = storage.ref().child(nombreArchivo);
-        await ref.put(file);
-        comprobanteURL = await ref.getDownloadURL();
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+        const respuesta = await fetch(CLOUDINARY_UPLOAD_URL, {
+            method: "POST",
+            body: formData
+        });
+        const data = await respuesta.json();
+        if (!respuesta.ok || !data.secure_url) {
+            throw new Error((data.error && data.error.message) || `Cloudinary respondió ${respuesta.status}`);
+        }
+        comprobanteURL = data.secure_url;
         if (estado) estado.innerText = "✅ Comprobante listo para enviar.";
     } catch (e) {
-        console.error(e);
+        console.error("Error subiendo comprobante a Cloudinary:", e);
         comprobanteURL = null;
         if (estado) estado.innerText = "❌ No pudimos subir el comprobante. Podés seguir sin adjuntarlo.";
+    } finally {
+        subiendoComprobante = false;
     }
 }
 
@@ -2875,6 +2890,7 @@ const PLANTILLA_WHATSAPP_DEFAULT = "*📦 NUEVO PEDIDO — {tienda}*\n*Cliente:*
 async function finalizarYEnviar() {
     if (STORE_CONFIG.pausada) return alert("Esta tienda no está recibiendo pedidos en este momento.");
     if (cart.length === 0) return alert("El carrito está vacío.");
+    if (subiendoComprobante) return alert("⏳ Todavía se está subiendo el comprobante. Esperá unos segundos y volvé a tocar Enviar.");
 
     const clienteTexto = usuarioLogueado
         ? `${usuarioLogueado.user}\n*Local:* ${usuarioLogueado.dir || 'Sin dirección'}`
