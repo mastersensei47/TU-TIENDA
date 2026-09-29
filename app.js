@@ -16,7 +16,7 @@
 // el sistema: es el mismo para todos los clientes, porque apunta al
 // proyecto "directorio", no a ningún cliente en particular.
 
-let db, auth, STORE_CONFIG;
+let db, auth, storage, STORE_CONFIG;
 let clienteApp, masterApp;
 
 function leerSlug() {
@@ -46,7 +46,7 @@ const CONFIG_DEFAULTS = {
     whatsappNumber: "", instagramUrl: "", facebookUrl: "", tiktokUrl: "",
     currency: "$", mapaUrl: "",
     pausada: false, bannerActivo: false, bannerTexto: "", bannerBgColor: "#f59e0b", bannerTextColor: "#000000",
-    pagos: { efectivo: true, transferencia: false, mercadopago: false, datosTransferencia: "" },
+    pagos: { efectivo: true, transferencia: false, mercadopago: false, datosTransferencia: "", descuentoTransferenciaPct: 0, cuotasCantidad: 0, cuotasRecargoPct: 0 },
     envios: { activo: false, info: "" },
     features: { wholesalePricing: true, stockControl: true, heroSlider: true, userRegistration: true, productVariants: false, mostrarMapa: false },
     layout: {
@@ -199,6 +199,10 @@ async function bootstrap() {
             clienteApp = await obtenerFirebaseApp("cliente", firebaseConfig);
             db = crearFirestore(clienteApp);
             auth = firebase.auth(clienteApp);
+            // Storage es opcional: si el negocio no lo habilitó en su Firebase
+            // (paso extra en la consola), esto no rompe nada — la función que
+            // sube el comprobante simplemente avisa que no está disponible.
+            try { storage = firebase.storage(clienteApp); } catch (_) { storage = null; }
         } catch (e) {
             return mostrarErrorSlug(errorFirebaseDetalle(e, `CLIENTE / ${firebaseConfig.projectId}`));
         }
@@ -242,6 +246,7 @@ let prods = [];
 let cart = [];
 let users = [];
 let orders = [];
+let avisosStock = [];
 let heroImages = [];
 let isMay = false;
 let esAdmin = false;
@@ -268,12 +273,15 @@ function toAuthEmail(input) {
 
 let unsubUsuariosAdmin = null;
 let unsubPedidosAdmin = null;
+let unsubAvisosStockAdmin = null;
 
 function detenerListenersAdmin() {
     if (typeof unsubUsuariosAdmin === "function") unsubUsuariosAdmin();
     if (typeof unsubPedidosAdmin === "function") unsubPedidosAdmin();
+    if (typeof unsubAvisosStockAdmin === "function") unsubAvisosStockAdmin();
     unsubUsuariosAdmin = null;
     unsubPedidosAdmin = null;
+    unsubAvisosStockAdmin = null;
 }
 
 function cargarDatosAdmin() {
@@ -288,6 +296,45 @@ function cargarDatosAdmin() {
         renderAdmO();
         renderAdmStats();
     }, err => console.warn("pedidos:", err.code || err));
+
+    unsubAvisosStockAdmin = db.collection("avisosStock").orderBy("fecha", "desc").onSnapshot(snap => {
+        avisosStock = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderAdmAvisosStock();
+    }, err => console.warn("avisosStock:", err.code || err));
+}
+
+// Lista de "avisame cuando haya stock" pendientes, dentro de la pestaña
+// CLIENTES. El admin las marca como avisadas (o las borra) a mano después
+// de escribirle al cliente — no manda ningún mensaje automático.
+function renderAdmAvisosStock() {
+    const list = document.getElementById("admListAvisosStock");
+    if (!list) return;
+    const pendientes = avisosStock.filter(a => !a.avisado);
+    if (pendientes.length === 0) {
+        list.innerHTML = `<p style="opacity:0.5; padding:20px; text-align:center;">No hay avisos pendientes.</p>`;
+        return;
+    }
+    list.innerHTML = pendientes.map(a => `
+        <div class="admin-item">
+            <div style="flex:1;">
+                <b>${a.productoNombre || 'Producto eliminado'}</b>
+                <div style="opacity:0.6; font-size:12px;">📱 ${a.contacto} — ${new Date(a.fecha).toLocaleDateString('es-AR')}</div>
+            </div>
+            <a href="https://wa.me/${a.contacto}" target="_blank" style="background:#25d366; color:#fff; padding:7px 12px; border-radius:9px; font-size:12px; font-weight:700; text-decoration:none;">💬 Escribir</a>
+            <button onclick="marcarAvisoStockHecho('${a.id}')" title="Marcar como avisado" style="color:var(--success); font-size:18px; cursor:pointer; background:none; border:none;">✅</button>
+            <button onclick="eliminarAvisoStock('${a.id}')" title="Eliminar" style="color:var(--danger); font-size:18px; cursor:pointer; background:none; border:none;">🗑️</button>
+        </div>
+    `).join("");
+}
+
+async function marcarAvisoStockHecho(id) {
+    try { await db.collection("avisosStock").doc(id).update({ avisado: true }); }
+    catch (e) { console.error(e); alert("No pudimos actualizar el aviso."); }
+}
+
+async function eliminarAvisoStock(id) {
+    try { await db.collection("avisosStock").doc(id).delete(); }
+    catch (e) { console.error(e); alert("No pudimos borrar el aviso."); }
 }
 
 function init() {
@@ -381,6 +428,7 @@ function init() {
         });
         render();
         if (esAdmin) renderAdmP();
+        poblarFiltroCompatibilidad();
     }, err => console.warn("productos:", err.code || err));
 
     db.collection("hero").onSnapshot(snap => {
@@ -879,12 +927,70 @@ function startProductImageRotators() {
 
 // ==================== CATÁLOGO ====================
 
+// Arma las opciones del filtro Marca/Modelo a partir de los productos que
+// tengan compatibilidad cargada. Si ninguno tiene, el filtro queda oculto
+// por completo — no todas las tiendas lo necesitan (ej: indumentaria).
+function poblarFiltroCompatibilidad() {
+    const cont = document.getElementById("filtroCompatContainer");
+    const marcaSel = document.getElementById("filtroMarca");
+    if (!cont || !marcaSel) return;
+
+    const marcas = new Set();
+    prods.forEach(p => (p.compatibilidad || []).forEach(c => { if (c.marca) marcas.add(c.marca); }));
+
+    if (marcas.size === 0) {
+        cont.style.display = "none";
+        return;
+    }
+    cont.style.display = "flex";
+
+    const marcaPrevia = marcaSel.value;
+    marcaSel.innerHTML = '<option value="">🔧 Todas las marcas</option>' +
+        [...marcas].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+    if ([...marcas].includes(marcaPrevia)) marcaSel.value = marcaPrevia;
+
+    poblarFiltroModelo();
+}
+
+function poblarFiltroModelo() {
+    const marcaSel = document.getElementById("filtroMarca");
+    const modeloSel = document.getElementById("filtroModelo");
+    if (!marcaSel || !modeloSel) return;
+    const marca = marcaSel.value;
+    const modeloPrevio = modeloSel.value;
+
+    if (!marca) {
+        modeloSel.innerHTML = '<option value="">Todos los modelos</option>';
+        modeloSel.value = "";
+        return;
+    }
+    const modelos = new Set();
+    prods.forEach(p => (p.compatibilidad || []).forEach(c => {
+        if (c.marca === marca && c.modelo) modelos.add(c.modelo);
+    }));
+    modeloSel.innerHTML = '<option value="">Todos los modelos</option>' +
+        [...modelos].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+    if ([...modelos].includes(modeloPrevio)) modeloSel.value = modeloPrevio;
+}
+
+function cambiarFiltroMarca() {
+    poblarFiltroModelo();
+    render();
+}
+
 function render() {
     const query = document.getElementById("searchInput").value.toLowerCase().trim();
     const cont = document.getElementById("productsCont");
+    const marcaSel = document.getElementById("filtroMarca");
+    const modeloSel = document.getElementById("filtroModelo");
+    const marcaElegida = marcaSel ? marcaSel.value : "";
+    const modeloElegido = modeloSel ? modeloSel.value : "";
     const filtered = prods.filter(p =>
         p.nombre.toLowerCase().includes(query) &&
-        (filterCat === "" || p.categoria === filterCat)
+        (filterCat === "" || p.categoria === filterCat) &&
+        (marcaElegida === "" || (Array.isArray(p.compatibilidad) && p.compatibilidad.some(c =>
+            c.marca === marcaElegida && (modeloElegido === "" || c.modelo === modeloElegido)
+        )))
     );
 
     if (filtered.length === 0) {
@@ -897,6 +1003,7 @@ function render() {
         const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://placehold.co/300x300?text=Sin+imagen');
         const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
         const sinStock = p.sinStock || (!conVariantes && Number(p.stock) <= 0);
+        const bajoStock = !sinStock && !conVariantes && Number(p.stock) > 0 && Number(p.stock) < 3;
         return `
             <div class="product-card" data-id="${p.id}" onclick="if(!event.target.closest('.btn-add')) showProductDetail('${p.id}')">
                 ${p.promo ? `<div class="promo-badge">${p.promo}</div>` : ''}
@@ -909,8 +1016,10 @@ function render() {
                 <div class="info-box">
                     <div class="prod-title">${p.nombre}</div>
                     <div class="price-val">${STORE_CONFIG.currency}${precioActual}</div>
-                    ${conVariantes ? '' : `<div class="stock-info">Stock: ${p.stock} unidades</div>`}
-                    <button class="btn-add" ${sinStock && !conVariantes ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} onclick="event.stopImmediatePropagation(); ${conVariantes ? `showProductDetail('${p.id}')` : `addToCart('${p.id}', event)`}">🛒 ${conVariantes ? 'Ver opciones' : (sinStock ? 'Sin stock' : 'Agregar')}</button>
+                    ${conVariantes ? '' : bajoStock ? `<div class="stock-info stock-bajo">⚡ ¡Solo quedan ${p.stock}!</div>` : `<div class="stock-info">Stock: ${p.stock} unidades</div>`}
+                    ${sinStock && !conVariantes
+                        ? `<button class="btn-add btn-avisar" onclick="event.stopImmediatePropagation(); abrirAvisoStock('${p.id}')">🔔 Avisame cuando haya</button>`
+                        : `<button class="btn-add" onclick="event.stopImmediatePropagation(); ${conVariantes ? `showProductDetail('${p.id}')` : `addToCart('${p.id}', event)`}">🛒 ${conVariantes ? 'Ver opciones' : 'Agregar'}</button>`}
                 </div>
             </div>`;
     }).join("");
@@ -1018,13 +1127,38 @@ async function showProductDetail(id) {
     const precioAMostrar = isMay ? (p.precio_may || p.precio) : p.precio;
     document.getElementById('detailPrice').innerHTML = `${STORE_CONFIG.currency} <strong>${precioAMostrar}</strong>`;
 
+    // Calculador de descuento por transferencia / cuotas (si el dueño los cargó)
+    const descEl = document.getElementById('detailDescuentos');
+    if (descEl) {
+        const pagosCfg = STORE_CONFIG.pagos || {};
+        const filas = [];
+        if (pagosCfg.transferencia && pagosCfg.descuentoTransferenciaPct > 0) {
+            const conDescuento = Math.round(precioAMostrar * (1 - pagosCfg.descuentoTransferenciaPct / 100));
+            filas.push(`<span style="color:var(--success); font-weight:700;">💸 ${pagosCfg.descuentoTransferenciaPct}% OFF por transferencia: ${STORE_CONFIG.currency}${conDescuento}</span>`);
+        }
+        if (pagosCfg.cuotasCantidad > 0) {
+            const montoConRecargo = precioAMostrar * (1 + (pagosCfg.cuotasRecargoPct || 0) / 100);
+            const porCuota = Math.round(montoConRecargo / pagosCfg.cuotasCantidad);
+            const leyenda = pagosCfg.cuotasRecargoPct > 0 ? '' : ' sin interés';
+            filas.push(`<span style="opacity:0.75;">💳 ${pagosCfg.cuotasCantidad} cuotas de ${STORE_CONFIG.currency}${porCuota}${leyenda}</span>`);
+        }
+        descEl.innerHTML = filas.join('');
+        descEl.style.display = filas.length ? 'flex' : 'none';
+    }
+
     // Variantes (talle/color) si el producto y la tienda las tienen activadas
     const varSection = document.getElementById('detailVarianteSection');
     const varSelect = document.getElementById('detailVarianteSelect');
     const detailStockEl = document.getElementById('detailStock');
+    const addBtn = document.getElementById('detailAddBtn');
+    const avisoBtn = document.getElementById('detailAvisoBtn');
+    const qtySection = document.getElementById('detailQtySection');
     if (p.tieneVariantes && STORE_CONFIG.features.productVariants) {
         detailStockEl.style.display = 'none';
         varSection.style.display = 'block';
+        qtySection.style.display = '';
+        addBtn.style.display = '';
+        avisoBtn.style.display = 'none';
         varSelect.innerHTML = '<option value="">Cargando...</option>';
         try {
             const snap = await db.collection("productos").doc(id).collection("variantes").orderBy("orden").get();
@@ -1042,7 +1176,20 @@ async function showProductDetail(id) {
         currentVariantes = [];
         varSection.style.display = 'none';
         detailStockEl.style.display = '';
-        detailStockEl.innerHTML = `Stock: <strong>${p.stock}</strong>`;
+        const sinStock = p.sinStock || Number(p.stock) <= 0;
+        const bajoStock = !sinStock && Number(p.stock) > 0 && Number(p.stock) < 3;
+        detailStockEl.innerHTML = bajoStock
+            ? `<strong style="color:var(--promo);">⚡ ¡Solo quedan ${p.stock} disponibles!</strong>`
+            : `Stock: <strong>${p.stock}</strong>`;
+        if (sinStock) {
+            qtySection.style.display = 'none';
+            addBtn.style.display = 'none';
+            avisoBtn.style.display = '';
+        } else {
+            qtySection.style.display = '';
+            addBtn.style.display = '';
+            avisoBtn.style.display = 'none';
+        }
     }
 
     document.getElementById('detailDesc').innerHTML = p.descripcion?.replace(/\n/g, '<br>') || '';
@@ -1101,8 +1248,48 @@ function addCurrentToCart() {
     if (exist) exist.qty += currentDetailQty;
     else cart.push({id: currentProductId, qty: currentDetailQty, variante});
     updateCartUI();
+    vibrar();
     animarAgregarCarrito(document.getElementById('detailImg'));
     closeProductDetail();
+}
+
+// Vibración táctil sutil (solo funciona en Android/Chrome — iOS Safari no
+// soporta la API de vibración, así que ahí simplemente no hace nada).
+function vibrar(ms = 35) {
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {}
+}
+
+// ==================== AVISOS DE STOCK ====================
+let avisoStockProductoId = null;
+
+function abrirAvisoStock(id) {
+    const p = prods.find(x => x.id === id);
+    if (!p) return;
+    avisoStockProductoId = id;
+    document.getElementById("avisoStockProducto").innerText = p.nombre;
+    document.getElementById("avisoStockTel").value = "";
+    openModal("avisoStockModal");
+}
+
+async function confirmarAvisoStock() {
+    const tel = document.getElementById("avisoStockTel").value.trim().replace(/[^0-9]/g, '');
+    if (!tel || tel.length < 6) return alert("Ingresá un WhatsApp válido");
+    const p = prods.find(x => x.id === avisoStockProductoId);
+    if (!p) return;
+    try {
+        await db.collection("avisosStock").add({
+            productoId: p.id,
+            productoNombre: p.nombre,
+            contacto: tel,
+            fecha: Date.now(),
+            avisado: false
+        });
+        closeAll();
+        alert("✅ Listo — te avisamos por WhatsApp apenas haya stock.");
+    } catch (e) {
+        console.error(e);
+        alert("No pudimos guardar tu aviso. Probá de nuevo en un momento.");
+    }
 }
 
 function addToCart(id, evt) {
@@ -1114,6 +1301,7 @@ function addToCart(id, evt) {
     if (exist) exist.qty++;
     else cart.push({id, qty: 1, variante: null});
     updateCartUI();
+    vibrar();
     const origenCard = evt && evt.target && evt.target.closest ? evt.target.closest('.product-card') : null;
     animarAgregarCarrito(origenCard ? origenCard.querySelector('.img-box img') : null);
 }
@@ -1282,6 +1470,26 @@ function llenarPerfil(data) {
 // Los pedidos hechos antes de esta actualización no tienen ese campo, así
 // que no van a aparecer acá — es una limitación de los datos viejos, no
 // un error.
+// ==================== SEGUIMIENTO DE ESTADO DEL PEDIDO ====================
+const ESTADOS_PEDIDO = [
+    { id: "recibido", label: "Recibido", icon: "📥" },
+    { id: "preparacion", label: "En preparación", icon: "📦" },
+    { id: "despachado", label: "Despachado", icon: "🚀" }
+];
+
+function renderEstadoPedidoHTML(estadoActual) {
+    const idx = Math.max(0, ESTADOS_PEDIDO.findIndex(e => e.id === (estadoActual || "recibido")));
+    return `<div class="estado-pedido-track">
+        ${ESTADOS_PEDIDO.map((e, i) => `
+            <div class="estado-pedido-step ${i <= idx ? 'activo' : ''}">
+                <span class="estado-pedido-dot">${i < idx ? '✓' : e.icon}</span>
+                <span class="estado-pedido-label">${e.label}</span>
+            </div>
+            ${i < ESTADOS_PEDIDO.length - 1 ? `<div class="estado-pedido-line ${i < idx ? 'activo' : ''}"></div>` : ''}
+        `).join('')}
+    </div>`;
+}
+
 async function verMisPedidos() {
     if (!usuarioLogueado) return;
     const cont = document.getElementById("misPedidosList");
@@ -1299,6 +1507,7 @@ async function verMisPedidos() {
                     <b style="color:var(--accent);">${o.total}</b>
                     <small>${new Date(o.fecha).toLocaleDateString('es-ES')}</small>
                 </div>
+                ${renderEstadoPedidoHTML(o.estado)}
                 <div style="font-size:12px; opacity:0.7; white-space:pre-wrap; margin-top:6px;">${o.detalle}</div>
             </div>
         `).join('');
@@ -1565,6 +1774,52 @@ function textoDatosTransferencia(datos) {
         .join("\n");
 }
 
+// ==================== COMPATIBILIDAD (Marca/Modelo) ====================
+function normalizarCompatibilidad(lista) {
+    if (!Array.isArray(lista)) return [];
+    return lista.map(x => ({
+        marca: String((x || {}).marca || "").trim(),
+        modelo: String((x || {}).modelo || "").trim()
+    })).filter(x => x.marca);
+}
+
+function obtenerCompatibilidad() {
+    const cont = document.getElementById("compatibilidadLista");
+    if (!cont) return [];
+    return [...cont.querySelectorAll(".download-link-row")].map(row => ({
+        marca: row.querySelector(".compat-marca")?.value.trim() || "",
+        modelo: row.querySelector(".compat-modelo")?.value.trim() || ""
+    })).filter(x => x.marca);
+}
+
+function renderCompatibilidad(lista = []) {
+    const cont = document.getElementById("compatibilidadLista");
+    if (!cont) return;
+    const items = normalizarCompatibilidad(lista);
+    cont.innerHTML = "";
+    if (items.length === 0) { agregarCompatibilidad(); return; }
+    items.forEach(x => agregarCompatibilidad(x.marca, x.modelo));
+}
+
+function agregarCompatibilidad(marca = "", modelo = "") {
+    const cont = document.getElementById("compatibilidadLista");
+    if (!cont) return;
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const row = document.createElement("div");
+    row.className = "download-link-row";
+    row.innerHTML = `
+        <input class="download-link-name compat-marca" placeholder="Marca (ej: Samsung)" value="${esc(marca)}">
+        <input class="download-link-url compat-modelo" placeholder="Modelo (ej: Galaxy A32)" value="${esc(modelo)}">
+        <button type="button" title="Eliminar" aria-label="Eliminar">✕</button>
+    `;
+    row.querySelector("button").addEventListener("click", () => {
+        row.remove();
+        const cont2 = document.getElementById("compatibilidadLista");
+        if (cont2 && !cont2.querySelector(".download-link-row")) agregarCompatibilidad();
+    });
+    cont.appendChild(row);
+}
+
 function normalizarLinksProducto(links) {
     if (!Array.isArray(links)) return [];
     return links.map(link => {
@@ -1645,6 +1900,7 @@ async function saveP() {
         caracteristicas: document.getElementById("fCaract").value.trim(),
         ficha: document.getElementById("fFicha").value.trim(),
         linksDescarga: obtenerLinksProducto(),
+        compatibilidad: obtenerCompatibilidad(),
         tieneVariantes: variantesParsed.length > 0
     };
 
@@ -1694,6 +1950,7 @@ function limpiarP() {
     document.getElementById("fCaract").value = "";
     document.getElementById("fFicha").value = "";
     renderLinksProducto([]);
+    renderCompatibilidad([]);
 }
 
 async function editP(id) {
@@ -1719,6 +1976,7 @@ async function editP(id) {
     document.getElementById("fCaract").value = p.caracteristicas || "";
     document.getElementById("fFicha").value = p.ficha || "";
     renderLinksProducto(p.linksDescarga || p.downloadLinks || p.enlaces || p.links || []);
+    renderCompatibilidad(p.compatibilidad || []);
 
     // Traer las variantes en vivo desde Firestore (no desde caché) para no
     // pisar por accidente el stock real con datos viejos al guardar.
@@ -1815,11 +2073,22 @@ function renderAdmO() {
                 <b style="color:var(--accent);">${o.total}</b>
                 <small>${new Date(o.fecha).toLocaleString('es-ES')}</small>
             </div>
+            ${o.clienteUid ? `
+                <select onchange="cambiarEstadoPedido('${o.id}', this.value)" style="margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.15); font-size:12px; font-weight:700;">
+                    ${ESTADOS_PEDIDO.map(e => `<option value="${e.id}" ${(o.estado || 'recibido') === e.id ? 'selected' : ''}>${e.icon} ${e.label}</option>`).join('')}
+                </select>
+            ` : `<span style="margin-top:8px; font-size:11px; opacity:0.4;">Pedido de invitado — sin seguimiento (no tiene cuenta)</span>`}
+            ${o.comprobanteUrl ? `<a href="${o.comprobanteUrl}" target="_blank" rel="noopener" style="margin-top:8px; display:inline-block; background:var(--accent); color:#fff; padding:7px 14px; border-radius:9px; font-size:12px; font-weight:700; text-decoration:none;">🧾 Ver comprobante</a>` : ''}
             <div style="font-size:13px; white-space:pre-wrap; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px; margin-top:8px; width:100%;">
                 ${o.detalle}
             </div>
         </div>
     `).join("");
+}
+
+async function cambiarEstadoPedido(id, nuevoEstado) {
+    try { await db.collection("pedidos").doc(id).update({ estado: nuevoEstado }); }
+    catch (e) { console.error(e); alert("No pudimos actualizar el estado del pedido."); }
 }
 
 // Exporta el historial de pedidos como CSV (se abre directo en Excel/Sheets,
@@ -2194,6 +2463,9 @@ function cargarFormConfig() {
     const pagos = STORE_CONFIG.pagos || {};
     document.getElementById("cfgPagoEfectivo").checked = pagos.efectivo !== false;
     document.getElementById("cfgPagoTransferencia").checked = !!pagos.transferencia;
+    document.getElementById("cfgDescuentoTransferencia").value = pagos.descuentoTransferenciaPct || "";
+    document.getElementById("cfgCuotasCantidad").value = pagos.cuotasCantidad || "";
+    document.getElementById("cfgCuotasRecargo").value = pagos.cuotasRecargoPct || "";
     renderDatosTransferencia(pagos.datosTransferencia);
 
     const env = STORE_CONFIG.envios || {};
@@ -2271,7 +2543,11 @@ async function guardarConfigTienda() {
         pagos: {
             efectivo: document.getElementById("cfgPagoEfectivo").checked,
             transferencia: document.getElementById("cfgPagoTransferencia").checked,
-            datosTransferencia: obtenerDatosTransferencia(),            mercadopago: document.getElementById("cfgPagoMercadoPago").checked
+            datosTransferencia: obtenerDatosTransferencia(),
+            descuentoTransferenciaPct: parseFloat(document.getElementById("cfgDescuentoTransferencia").value) || 0,
+            mercadopago: document.getElementById("cfgPagoMercadoPago").checked,
+            cuotasCantidad: parseInt(document.getElementById("cfgCuotasCantidad").value) || 0,
+            cuotasRecargoPct: parseFloat(document.getElementById("cfgCuotasRecargo").value) || 0
         },
         logoUrl: document.getElementById("cfgLogoUrl").value.trim(),
         pwaIconUrl: document.getElementById("cfgPwaIconUrl").value.trim(),
@@ -2391,10 +2667,74 @@ function renderMetodoPagoSelector() {
     if (!cont) return;
     if (metodos.length <= 1) {
         cont.style.display = "none";
+        actualizarVisibilidadComprobante();
         return;
     }
     document.getElementById("metodoPagoSelect").innerHTML = metodos.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
     cont.style.display = "block";
+    actualizarVisibilidadComprobante();
+}
+
+// El método "efectivo" de un solo elemento no muestra selector — por eso
+// esta función recalcula cuál es el método REALMENTE elegido en cada caso,
+// en vez de asumir que siempre hay un <select> visible.
+function metodoPagoElegidoActual() {
+    const metodos = metodosPagoActivos();
+    if (metodos.length === 0) return null;
+    if (metodos.length === 1) return metodos[0].id;
+    const sel = document.getElementById("metodoPagoSelect");
+    return (sel && sel.value) || metodos[0].id;
+}
+
+function actualizarVisibilidadComprobante() {
+    const cont = document.getElementById("comprobanteContainer");
+    if (!cont) return;
+    const esTransferencia = metodoPagoElegidoActual() === "transferencia";
+    cont.style.display = esTransferencia ? "block" : "none";
+    if (!esTransferencia) {
+        comprobanteURL = null;
+        const input = document.getElementById("comprobanteInput");
+        const estado = document.getElementById("comprobanteEstado");
+        if (input) input.value = "";
+        if (estado) estado.innerText = "";
+    }
+}
+
+// ==================== COMPROBANTE DE TRANSFERENCIA ====================
+// Sube la imagen a Firebase Storage (si el negocio lo tiene habilitado) y
+// guarda la URL para adjuntarla al pedido. Como WhatsApp no deja mandar
+// una imagen dentro de un link de "click to chat", el mensaje incluye el
+// link al comprobante en vez de la imagen en sí — al tocarlo, el dueño la
+// ve directo.
+let comprobanteURL = null;
+
+async function subirComprobante(file) {
+    const estado = document.getElementById("comprobanteEstado");
+    if (!file) return;
+    if (!storage) {
+        if (estado) estado.innerText = "⚠️ Esta tienda todavía no tiene la subida de comprobantes habilitada.";
+        return;
+    }
+    if (!file.type.startsWith("image/")) {
+        if (estado) estado.innerText = "⚠️ Tiene que ser una imagen.";
+        return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+        if (estado) estado.innerText = "⚠️ La imagen pesa más de 8MB, probá con una más liviana (una captura de pantalla común sirve).";
+        return;
+    }
+    if (estado) estado.innerText = "⏳ Subiendo...";
+    try {
+        const nombreArchivo = `comprobantes/${STORE_CONFIG.storeId}/${Date.now()}_${file.name}`.replace(/\s+/g, "_");
+        const ref = storage.ref().child(nombreArchivo);
+        await ref.put(file);
+        comprobanteURL = await ref.getDownloadURL();
+        if (estado) estado.innerText = "✅ Comprobante listo para enviar.";
+    } catch (e) {
+        console.error(e);
+        comprobanteURL = null;
+        if (estado) estado.innerText = "❌ No pudimos subir el comprobante. Podés seguir sin adjuntarlo.";
+    }
 }
 
 // Selector de entrega: solo aparece si el comercio activó los envíos.
@@ -2411,6 +2751,125 @@ function renderEntregaSelector() {
     }
 }
 
+// ==================== PRESUPUESTO EN PDF ====================
+// Genera una cotización formal del carrito actual, sin descontar stock ni
+// mandar nada — es solo un documento para el cliente (ideal para compras
+// corporativas o mayoristas que necesitan algo formal antes de confirmar).
+async function cargarImagenComoDataURL(url) {
+    try {
+        const resp = await fetch(url, { mode: "cors" });
+        if (!resp.ok) return null;
+        const blob = await resp.blob();
+        return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+        });
+    } catch (_) {
+        return null; // el host de la imagen no permite CORS — seguimos sin logo
+    }
+}
+
+async function descargarPresupuestoPDF() {
+    if (cart.length === 0) return alert("El carrito está vacío.");
+    if (!window.jspdf || !window.jspdf.jsPDF) return alert("No pudimos cargar el generador de PDF. Revisá tu conexión y probá de nuevo.");
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    // Logo (mejor esfuerzo — si el host de la imagen no permite CORS, se
+    // sigue de largo sin romper nada y el PDF queda solo con texto).
+    if (STORE_CONFIG.logoUrl) {
+        const dataUrl = await cargarImagenComoDataURL(STORE_CONFIG.logoUrl);
+        if (dataUrl) {
+            try {
+                doc.addImage(dataUrl, "JPEG", 15, y, 28, 28);
+            } catch (_) { /* formato no soportado, seguimos sin logo */ }
+        }
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(STORE_CONFIG.storeName || "Tienda", 50, y + 8);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    if (STORE_CONFIG.address) doc.text(STORE_CONFIG.address, 50, y + 15);
+    if (STORE_CONFIG.whatsappNumber) doc.text(`WhatsApp: ${STORE_CONFIG.whatsappNumber}`, 50, y + 21);
+
+    y += 40;
+    doc.setDrawColor(200);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 12;
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.text("PRESUPUESTO", 15, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(new Date().toLocaleDateString('es-AR'), pageWidth - 15, y, { align: "right" });
+    y += 8;
+    if (usuarioLogueado) {
+        doc.text(`Cliente: ${usuarioLogueado.user}`, 15, y);
+        y += 6;
+    }
+    y += 6;
+
+    // Encabezado de la tabla
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.setFontSize(10);
+    doc.text("Producto", 15, y);
+    doc.text("Cant.", pageWidth - 75, y, { align: "right" });
+    doc.text("Precio unit.", pageWidth - 45, y, { align: "right" });
+    doc.text("Subtotal", pageWidth - 15, y, { align: "right" });
+    y += 3;
+    doc.setDrawColor(0);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 7;
+
+    doc.setFont("helvetica", "normal");
+    let totalNumerico = 0;
+    cart.forEach(item => {
+        const p = prods.find(x => x.id === item.id);
+        if (!p) return;
+        const precioUnit = isMay ? (p.precio_may || p.precio) : p.precio;
+        const subtotal = precioUnit * item.qty;
+        totalNumerico += subtotal;
+
+        if (y > 270) { doc.addPage(); y = 20; }
+        const nombreLinea = item.variante ? `${p.nombre} — ${item.variante}` : p.nombre;
+        doc.text(nombreLinea.length > 45 ? nombreLinea.slice(0, 45) + "…" : nombreLinea, 15, y);
+        doc.text(String(item.qty), pageWidth - 75, y, { align: "right" });
+        doc.text(`${STORE_CONFIG.currency}${precioUnit}`, pageWidth - 45, y, { align: "right" });
+        doc.text(`${STORE_CONFIG.currency}${subtotal}`, pageWidth - 15, y, { align: "right" });
+        y += 8;
+    });
+
+    y += 4;
+    doc.line(15, y, pageWidth - 15, y);
+    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.text(`TOTAL: ${STORE_CONFIG.currency}${totalNumerico}`, pageWidth - 15, y, { align: "right" });
+
+    y += 20;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(130);
+    doc.text("Presupuesto sujeto a disponibilidad de stock al momento de confirmar la compra.", 15, y);
+    doc.text("No incluye costo de envío salvo que se indique lo contrario.", 15, y + 5);
+
+    const nombreArchivo = `presupuesto-${(STORE_CONFIG.storeName || "tienda").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}.pdf`;
+    doc.save(nombreArchivo);
+    vibrar();
+}
+
 const PLANTILLA_WHATSAPP_DEFAULT = "*📦 NUEVO PEDIDO — {tienda}*\n*Cliente:* {cliente}\n{pago}----------------------------\n{lista}----------------------------\n*TOTAL ESTIMADO: {total}*";
 
 async function finalizarYEnviar() {
@@ -2424,12 +2883,7 @@ async function finalizarYEnviar() {
     // Medio de pago elegido (si hay más de uno configurado, el que
     // seleccionó el cliente; si hay uno solo, se usa directo)
     const metodos = metodosPagoActivos();
-    let metodoElegido = null;
-    if (metodos.length === 1) metodoElegido = metodos[0].id;
-    else if (metodos.length > 1) {
-        const sel = document.getElementById("metodoPagoSelect");
-        metodoElegido = (sel && sel.value) || metodos[0].id;
-    }
+    const metodoElegido = metodoPagoElegidoActual();
     let pagoTexto = "";
     const envios = STORE_CONFIG.envios || {};
     if (envios.activo) {
@@ -2443,6 +2897,9 @@ async function finalizarYEnviar() {
         if (metodoElegido === "transferencia" && STORE_CONFIG.pagos.datosTransferencia) {
             const txt = textoDatosTransferencia(STORE_CONFIG.pagos.datosTransferencia);
             if (txt) pagoTexto += `*Datos para transferir:*\n${txt}\n`;
+        }
+        if (metodoElegido === "transferencia" && comprobanteURL) {
+            pagoTexto += `*Comprobante:* ${comprobanteURL}\n`;
         }
     }
 
@@ -2508,14 +2965,22 @@ async function finalizarYEnviar() {
             montoTotal: montoTotalNumerico,
             clienteUid: usuarioLogueado ? usuarioLogueado.id : null,
             clienteUser: usuarioLogueado ? usuarioLogueado.user : null,
-            items: itemsPedido
+            items: itemsPedido,
+            estado: "recibido",
+            comprobanteUrl: (metodoElegido === "transferencia" && comprobanteURL) ? comprobanteURL : null
         });
 
         notificarPedidoPorEmail(textoPedido, total); // no bloquea ni rompe el checkout si falla
 
         window.open(`https://wa.me/${STORE_CONFIG.whatsappNumber}?text=${encodeURIComponent(textoPedido)}`);
 
+        vibrar([40, 60, 40]);
         cart = [];
+        comprobanteURL = null;
+        const compInput = document.getElementById("comprobanteInput");
+        const compEstado = document.getElementById("comprobanteEstado");
+        if (compInput) compInput.value = "";
+        if (compEstado) compEstado.innerText = "";
         updateCartUI();
         closeAll();
         alert("✅ Pedido enviado y stock actualizado");
