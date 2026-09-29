@@ -29,6 +29,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js" defer></script>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
 
     <link rel="preconnect" href="https://www.gstatic.com">
@@ -56,6 +57,7 @@
         }
     })();
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="dark">
 
@@ -95,6 +97,15 @@
 
 <div class="cat-scroll" id="catBar"></div>
 
+<div id="filtroCompatContainer" style="display:none; padding:0 16px 12px; gap:8px; flex-wrap:wrap;">
+    <select id="filtroMarca" onchange="cambiarFiltroMarca()" style="flex:1; min-width:140px; padding:11px 12px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:13px;">
+        <option value="">🔧 Todas las marcas</option>
+    </select>
+    <select id="filtroModelo" onchange="render()" style="flex:1; min-width:140px; padding:11px 12px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:13px;">
+        <option value="">Todos los modelos</option>
+    </select>
+</div>
+
 <div class="search-container">
     <input type="text" id="searchInput" class="search-bar" placeholder="Busca marcas o productos..." autocomplete="off" name="busqueda-productos" data-form-type="other" data-lpignore="true" data-1p-ignore readonly
         onmousedown="this.removeAttribute('readonly')" ontouchstart="this.removeAttribute('readonly')"
@@ -102,6 +113,7 @@
         onblur="setTimeout(()=>{const b=document.getElementById('searchSuggestions'); if(b) b.style.display='none';}, 150)">
     <div id="searchSuggestions" class="search-suggestions"></div>
 </div>
+
 
 <div class="products-grid" id="productsCont"></div>
 
@@ -126,18 +138,20 @@
                 </div>
             </div>
             <div id="detailPrice" class="detail-price"></div>
+            <div id="detailDescuentos" style="display:none; margin:4px 0 10px; font-size:13px; display:flex; flex-direction:column; gap:4px;"></div>
             <div id="detailStock" class="detail-stock"></div>
             <div id="detailVarianteSection" style="display:none; margin: 15px 0;">
                 <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Elegí una opción:</label>
                 <select id="detailVarianteSelect" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;"></select>
             </div>
-            <div class="detail-qty">
+            <div id="detailQtySection" class="detail-qty">
                 <span style="font-weight:700; font-size:16px;">Cantidad:</span>
                 <button onclick="changeDetailQty(-1)" class="qty-btn">−</button>
                 <input id="detailQtyInput" type="number" value="1" min="1" style="width:80px;text-align:center;font-size:22px;font-weight:700;border:none;background:transparent;">
                 <button onclick="changeDetailQty(1)" class="qty-btn">+</button>
             </div>
-            <button onclick="addCurrentToCart()" class="btn-add detail-btn">🛒 Agregar al carrito</button>
+            <button id="detailAddBtn" onclick="addCurrentToCart()" class="btn-add detail-btn">🛒 Agregar al carrito</button>
+            <button id="detailAvisoBtn" onclick="abrirAvisoStock(currentProductId)" class="btn-add detail-btn" style="display:none; background:#475569;">🔔 Avisame cuando haya stock</button>
             <div class="detail-sections">
                 <details open>
                     <summary>Descripción</summary>
@@ -198,6 +212,12 @@
                     <textarea id="fVariantes" rows="4" placeholder="S | 5&#10;M | 8&#10;L | 0"></textarea>
                 </div>
                 <div class="form-group">
+                    <label>Compatible con (opcional)</label>
+                    <p class="admin-help">Marca + modelo con los que funciona este producto (ej: Samsung / Galaxy A32). Se usa para el filtro de compatibilidad del catálogo — dejalo vacío si no aplica.</p>
+                    <div id="compatibilidadLista" class="download-links-list"></div>
+                    <button type="button" class="btn-add download-link-add-btn" onclick="agregarCompatibilidad()">+ Agregar modelo compatible</button>
+                </div>
+                <div class="form-group">
                     <label>Galería de imágenes</label>
                     <p class="admin-help">Agregá una URL por fila. Podés eliminar, reordenar y sumar imágenes sin tener que editar todo el bloque.</p>
                     <div id="imagenesProducto" class="image-url-list"></div>
@@ -231,7 +251,11 @@
             <div id="admListP"></div>
         </div>
 
-        <div id="t-user" style="display:none;"><div id="admListU"></div></div>
+        <div id="t-user" style="display:none;">
+            <div id="admListU"></div>
+            <h4 style="margin:30px 0 12px; opacity:0.7;">🔔 Avisos de stock pendientes</h4>
+            <div id="admListAvisosStock"></div>
+        </div>
 
         <div id="t-order" style="display:none;">
             <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
@@ -455,9 +479,25 @@
                         <div id="datosTransferenciaLista" class="download-links-list"></div>
                         <button type="button" class="btn-add download-link-add-btn" onclick="agregarDatoTransferencia()">+ Agregar dato</button>
                     </div>
+                    <div class="form-group">
+                        <label>Descuento por transferencia (opcional)</label>
+                        <input id="cfgDescuentoTransferencia" type="number" min="0" max="100" placeholder="Ej: 10 (para 10% OFF)">
+                        <p class="admin-help">Si lo cargás, en la ficha de cada producto se muestra el precio con ese descuento aplicado al pagar por transferencia. Dejalo en 0 o vacío para no mostrar nada.</p>
+                    </div>
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:15px; cursor:pointer;">
                         <input type="checkbox" id="cfgPagoMercadoPago" style="width:20px; height:20px;"> Mercado Pago
                     </label>
+                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; min-width:160px;">
+                            <label>Cuotas a mostrar</label>
+                            <input id="cfgCuotasCantidad" type="number" min="0" max="24" placeholder="Ej: 3">
+                        </div>
+                        <div class="form-group" style="flex:1; min-width:160px;">
+                            <label>Recargo de esas cuotas (%)</label>
+                            <input id="cfgCuotasRecargo" type="number" min="0" max="100" placeholder="0 = sin interés">
+                        </div>
+                    </div>
+                    <p class="admin-help" style="margin-top:-10px;">Si cargás una cantidad de cuotas, en la ficha de cada producto se muestra "X cuotas de $Y" (sin interés si dejás el recargo en 0).</p>
 
                     <h4 style="margin-top:30px; opacity:0.7;">🚚 Envíos</h4>
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:6px; cursor:pointer; font-weight:700;">
@@ -510,6 +550,16 @@
         <p style="margin-top:8px; font-size:13px;"><span onclick="openModal('setupModal')" style="color:var(--accent); cursor:pointer; opacity:0.7;">¿Sos el administrador y todavía no tenés cuenta?</span></p>
         <button onclick="closeAll()" style="background:none; border:2px solid rgba(255,255,255,0.3); color:white; padding:16px; border-radius:16px; font-weight:700; width:100%; margin-top:15px;">← Volver atrás</button>
         <p id="regPrompt" style="margin-top:30px; font-size:14px;">¿No tenés cuenta? <span onclick="abrirRegistro()" style="color:var(--accent); cursor:pointer; font-weight:800;">Solicitá una acá</span></p>
+    </div>
+</div>
+
+<div class="modal" id="avisoStockModal">
+    <div class="modal-content" style="max-width:420px; margin:40px auto; padding:30px;">
+        <h2 style="text-align:center; margin-bottom:5px;">🔔 Avisame cuando haya stock</h2>
+        <p id="avisoStockProducto" style="text-align:center; opacity:0.6; font-size:13px; margin-bottom:20px;"></p>
+        <div class="form-group"><label>Tu WhatsApp</label><input id="avisoStockTel" placeholder="Ej: 3424123456"></div>
+        <button class="btn-add" style="background:var(--success); margin-top:10px;" onclick="confirmarAvisoStock()">AVISARME</button>
+        <button class="btn-add" style="background:none; color:white; margin-top:10px; opacity:0.6;" onclick="closeAll()">Cerrar</button>
     </div>
 </div>
 
@@ -630,9 +680,15 @@
             </div>
             <div id="metodoPagoContainer" style="display:none; margin-bottom:20px;">
                 <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Método de pago</label>
-                <select id="metodoPagoSelect" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;"></select>
+                <select id="metodoPagoSelect" onchange="actualizarVisibilidadComprobante()" style="width:100%; padding:14px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:15px;"></select>
+            </div>
+            <div id="comprobanteContainer" style="display:none; margin-bottom:20px;">
+                <label style="font-weight:700; font-size:14px; display:block; margin-bottom:8px;">Comprobante de transferencia (opcional)</label>
+                <input type="file" id="comprobanteInput" accept="image/*" onchange="subirComprobante(this.files[0])" style="width:100%; font-size:13px;">
+                <p id="comprobanteEstado" style="font-size:12px; margin-top:6px; opacity:0.7;"></p>
             </div>
             <button id="btnFinalizarPedido" class="btn-add" style="background:#25d366; padding:22px; font-size:16px;" onclick="finalizarYEnviar()">ENVIAR PEDIDO POR WHATSAPP 🚀</button>
+            <button class="btn-add" style="background:rgba(255,255,255,0.08); margin-top:10px; padding:14px; font-size:13px;" onclick="descargarPresupuestoPDF()">📄 Descargar presupuesto en PDF</button>
         </div>
     </div>
 </div>
