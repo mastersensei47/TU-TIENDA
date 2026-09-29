@@ -259,6 +259,9 @@
             font-weight: 700;
             margin-bottom: 15px;
         }
+        .stock-info.stock-bajo { color: var(--promo); animation: pulseBajoStock 1.4s ease-in-out infinite; }
+        @keyframes pulseBajoStock { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .btn-avisar { background: #475569 !important; }
         .btn-add {
             background: var(--accent);
             color: white;
@@ -462,6 +465,39 @@
             margin-bottom: 12px;
             border: 1px solid rgba(255,255,255,0.05);
         }
+        .estado-pedido-track {
+            display: flex;
+            align-items: flex-start;
+            width: 100%;
+            margin-top: 12px;
+        }
+        .estado-pedido-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            flex: 0 0 auto;
+            width: 72px;
+        }
+        .estado-pedido-dot {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px;
+            opacity: 0.4;
+        }
+        .estado-pedido-step.activo .estado-pedido-dot { background: var(--success); opacity: 1; }
+        .estado-pedido-label { font-size: 9.5px; text-align: center; opacity: 0.5; font-weight: 700; line-height: 1.25; }
+        .estado-pedido-step.activo .estado-pedido-label { opacity: 0.9; }
+        .estado-pedido-line {
+            flex: 1;
+            height: 3px;
+            background: rgba(255,255,255,0.08);
+            margin-top: 15px;
+            border-radius: 2px;
+        }
+        .estado-pedido-line.activo { background: var(--success); }
         .admin-item-img {
             width: 60px;
             height: 60px;
