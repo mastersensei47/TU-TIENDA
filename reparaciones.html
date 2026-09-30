@@ -146,12 +146,19 @@
             <div class="stat-box"><small>ESTE MES</small><div class="valor" id="statMes">0</div></div>
             <div class="stat-box"><small>GANANCIA DEL MES</small><div class="valor" id="statGananciaMes" style="color:var(--success);">$0</div></div>
             <div class="stat-box"><small>🔥 URGENTES</small><div class="valor" id="statUrgentes" style="color:var(--danger);">0</div></div>
+            <div class="stat-box" onclick="abrirApartados()" style="cursor:pointer;" title="Ver apartados"><small>💼 NO CUENTA / APARTADO</small><div class="valor" id="statNoCuenta" style="color:var(--promo);">$0</div></div>
         </div>
 
         <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
             <button id="btnNuevo" class="btn-add" style="background:var(--success); flex:2; min-width:200px; margin-top:0;" onclick="abrirFormNuevo()">+ NUEVO REGISTRO</button>
             <button class="btn-add" style="background:var(--accent); flex:1; min-width:140px; margin-top:0;" onclick="exportarReparacionesCSV()">📊 Exportar</button>
             <button id="btnInstalarApp" class="btn-add install-app-btn" style="background:#7c3aed;" onclick="instalarApp()">📲 INSTALAR COMO APP</button>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn-add" style="background:#0ea5e9; flex:1; min-width:170px; margin-top:0;" onclick="Proveedores.abrir()">🛒 Proveedores y presupuestos</button>
+            <button class="btn-add" style="background:#8b5cf6; flex:1; min-width:140px; margin-top:0;" onclick="Deudas.abrirModal()">📒 Deudores</button>
+            <button class="btn-add" style="background:var(--promo); flex:1; min-width:140px; margin-top:0;" onclick="abrirApartados()">💼 Apartados</button>
         </div>
 
         <div class="taller-card">
@@ -213,10 +220,47 @@
         <div class="form-group"><label>Garantía en días (opcional)</label><input id="rGarantiaDias" type="number" placeholder="Ej: 30"></div>
         <div class="form-group"><label>Notas (opcional)</label><textarea id="rNotas" rows="2"></textarea></div>
 
+        <div class="form-group" style="background:rgba(255,255,255,.035); padding:15px; border-radius:14px;">
+            <label>¿Cuenta en la ganancia total?</label>
+            <select id="rCuentaGanancia" onchange="actualizarCamposApartado()">
+                <option value="siempre">Sí, cuenta siempre</option>
+                <option value="en_reparacion">Recién cuando deje de estar «Pendiente»</option>
+                <option value="listo">Recién cuando esté «Listo para retirar»</option>
+                <option value="entregado">Recién cuando esté «Entregado»</option>
+                <option value="no">No cuenta (apartarla)</option>
+            </select>
+            <div id="rApartadoBox" style="display:none; margin-top:14px;">
+                <label>Apartado (opcional)</label>
+                <select id="rApartado" style="margin-bottom:14px;"></select>
+                <label>Motivo (opcional)</label>
+                <input id="rMotivoNoCuenta" list="motivosSugeridos" placeholder="Ej: seña, reservado para repuestos...">
+                <datalist id="motivosSugeridos">
+                    <option value="Pago a cuenta / seña"></option>
+                    <option value="Reservado para comprar repuestos"></option>
+                    <option value="Cliente todavía no pagó"></option>
+                    <option value="Trabajo en garantía"></option>
+                    <option value="Plata de un tercero"></option>
+                    <option value="Préstamo / adelanto"></option>
+                </datalist>
+            </div>
+        </div>
+
         <p id="rGananciaPreview" style="opacity:0.7; font-size:13px; margin-bottom:15px;"></p>
 
         <button class="btn-add" style="background:var(--success);" onclick="guardarReparacion()">GUARDAR</button>
         <button class="btn-add" style="background:none; color:white; margin-top:10px; opacity:0.6;" onclick="cerrarFormModal()">Cancelar</button>
+    </div>
+</div>
+
+<div class="modal" id="apartadosModal" style="align-items:flex-start; overflow-y:auto;">
+    <div class="modal-content" style="max-width:560px; width:100%; margin:30px auto; padding:25px;">
+        <div class="flex-between" style="margin-bottom:8px; align-items:center;">
+            <h3 style="margin:0;">💼 Apartados</h3>
+            <button type="button" onclick="cerrarApartados()" style="background:none; border:none; color:var(--text); font-size:26px; cursor:pointer;">✕</button>
+        </div>
+        <p style="opacity:.55; font-size:12px; line-height:1.45; margin:0 0 18px;">Acá ves la ganancia que todavía no cuenta en el total (o que decidiste apartar), ordenada por apartado. Cuando corresponda, tocá «Contar ya» y pasa a la ganancia total.</p>
+        <div id="apartadosCont"></div>
+        <button type="button" class="btn-add" style="background:none; color:white; margin-top:14px; opacity:.6;" onclick="cerrarApartados()">Cerrar</button>
     </div>
 </div>
 
@@ -264,6 +308,8 @@
 </div>
 
 <script src="config.js" defer></script>
-<script src="reparaciones.js?v=20260907-multistore" defer></script>
+<script src="deudas.js?v=20260929-deudas" defer></script>
+<script src="proveedores.js?v=20260929-deudas" defer></script>
+<script src="reparaciones.js?v=20260929-deudas" defer></script>
 </body>
 </html>
