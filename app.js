@@ -90,6 +90,29 @@ function construirStoreConfig(slug, datosTienda) {
 }
 
 
+// ---- Caché local (solo datos PÚBLICOS del catálogo) para que, desde la segunda
+// visita, la tienda se pinte al instante sin esperar la cadena de consultas.
+function leerCacheLS(clave) {
+    try { const raw = localStorage.getItem(clave); return raw ? JSON.parse(raw) : null; } catch (_) { return null; }
+}
+function guardarCacheLS(clave, valor) {
+    try {
+        const txt = JSON.stringify(valor);
+        if (txt.length > 1500000) return; // demasiado grande: no vale la pena
+        localStorage.setItem(clave, txt);
+    } catch (_) {}
+}
+
+// Si la imagen está en Cloudinary, pide una versión liviana y en formato
+// moderno (f_auto,q_auto) para las tarjetas. Con otras URLs no hace nada.
+function miniaturaImg(url, ancho) {
+    const u = String(url || "");
+    if (u.includes("res.cloudinary.com") && /\/image\/upload\/v\d+\//.test(u)) {
+        return u.replace("/image/upload/", `/image/upload/f_auto,q_auto,w_${ancho || 500}/`);
+    }
+    return u;
+}
+
 function obtenerFirebaseApp(nombre, config) {
     try { return firebase.app(nombre); }
     catch (_) { return firebase.initializeApp(config, nombre); }
@@ -131,6 +154,59 @@ function errorFirebaseDetalle(e, etapa = "Firebase") {
     return `${etapa}: ${message}${code ? ` [${code}]` : ""}.${ayuda}`;
 }
 
+function suscribirConfigTienda(slug, firebaseConfig) {
+    // Mantener actualizada la configuración visual desde el Firebase de la tienda.
+    db.collection("config").doc("tienda").onSnapshot(cfgDoc => {
+        const fresh = cfgDoc.exists ? (cfgDoc.data() || {}) : {};
+        STORE_CONFIG = construirStoreConfig(slug, fresh);
+        const previo = leerCacheTienda(slug) || {};
+        guardarCacheTienda(slug, { ...previo, firebaseConfig: previo.firebaseConfig || firebaseConfig, datosTienda: fresh });
+        try { aplicarTema(); } catch (e) { console.warn("aplicarTema:", e); }
+        try { aplicarBranding(); } catch (e) { console.warn("aplicarBranding:", e); }
+        try { renderCategorias(); } catch (e) { console.warn("renderCategorias:", e); }
+        try { renderCategoriasSelect(); } catch (e) { console.warn("renderCategoriasSelect:", e); }
+        try { renderBanners(); } catch (e) { console.warn("renderBanners:", e); }
+        try { aplicarLayout(); } catch (e) { console.warn("aplicarLayout:", e); }
+        try { aplicarManifestPWA(); } catch (e) { console.warn("aplicarManifestPWA:", e); }
+        try { aplicarOpenGraph(); } catch (e) { console.warn("aplicarOpenGraph:", e); }
+        try { renderHeroSlider(); } catch (e) { console.warn("renderHeroSlider:", e); }
+        try { cargarFormConfig(); } catch (e) { console.warn("cargarFormConfig:", e); }
+    }, e => console.warn(`CLIENTE / ${firebaseConfig.projectId} / config/tienda:`, e));
+}
+
+// Arranque rápido: la tienda ya se mostró con los datos guardados; acá se
+// confirma en segundo plano con el MASTER que sigue activa y que su conexión
+// no cambió. Si cambió, se actualiza la caché y se recarga UNA vez.
+async function verificarMasterEnSegundoPlano(slug, configUsada) {
+    try {
+        let app = obtenerFirebaseApp("master", MASTER_FIREBASE_CONFIG);
+        if (app && typeof app.then === "function") app = await app;
+        const doc = await crearFirestore(app).collection("clientes").doc(slug).get();
+        if (!doc.exists) {
+            try { localStorage.removeItem("tu_tienda_cache_" + slug); } catch (_) {}
+            return mostrarErrorSlug(`El slug "${slug}" no existe en Firebase MASTER. Revisá clientes/${slug}.`);
+        }
+        const datos = doc.data() || {};
+        if (datos.activo === false) {
+            try { localStorage.removeItem("tu_tienda_cache_" + slug); } catch (_) {}
+            return mostrarErrorSlug(`La tienda "${slug}" está marcada como INACTIVA en Firebase MASTER.`);
+        }
+        const fc = datos.firebaseConfig;
+        if (fc && typeof fc === "object" && JSON.stringify(fc) !== JSON.stringify(configUsada)) {
+            const previo = leerCacheTienda(slug) || {};
+            guardarCacheTienda(slug, { ...previo, firebaseConfig: fc });
+            try {
+                if (!sessionStorage.getItem("tu_tienda_recarga_cfg")) {
+                    sessionStorage.setItem("tu_tienda_recarga_cfg", "1");
+                    location.reload();
+                }
+            } catch (_) {}
+        }
+    } catch (e) {
+        console.warn("Verificación en segundo plano (MASTER):", e);
+    }
+}
+
 async function bootstrap() {
     const slug = leerSlug();
 
@@ -147,6 +223,23 @@ async function bootstrap() {
     // IMPORTANTE: el slug de la URL es la única fuente de verdad.
     // Nunca usamos localStorage para decidir qué tienda abrir.
     try {
+        // ---------------- ARRANQUE RÁPIDO (desde la 2ª visita) ----------------
+        const cache = leerCacheTienda(slug);
+        if (cache && cache.firebaseConfig && cache.datosTienda) {
+            try {
+                clienteApp = obtenerFirebaseApp("cliente", cache.firebaseConfig);
+                db = crearFirestore(clienteApp);
+                auth = firebase.auth(clienteApp);
+                STORE_CONFIG = construirStoreConfig(slug, cache.datosTienda);
+                init();
+                suscribirConfigTienda(slug, cache.firebaseConfig);
+                verificarMasterEnSegundoPlano(slug, cache.firebaseConfig);
+                return;
+            } catch (e) {
+                console.warn("Arranque rápido falló; se usa el arranque normal:", e);
+            }
+        }
+
         // ---------------- MASTER ----------------
         try {
             masterApp = obtenerFirebaseApp("master", MASTER_FIREBASE_CONFIG);
@@ -216,23 +309,9 @@ async function bootstrap() {
         }
 
         STORE_CONFIG = construirStoreConfig(slug, datosTienda);
+        guardarCacheTienda(slug, { firebaseConfig, datosTienda });
         init();
-
-        // Mantener actualizada la configuración visual desde el Firebase de la tienda.
-        db.collection("config").doc("tienda").onSnapshot(cfgDoc => {
-            const fresh = cfgDoc.exists ? (cfgDoc.data() || {}) : {};
-            STORE_CONFIG = construirStoreConfig(slug, fresh);
-            try { aplicarTema(); } catch (e) { console.warn("aplicarTema:", e); }
-            try { aplicarBranding(); } catch (e) { console.warn("aplicarBranding:", e); }
-            try { renderCategorias(); } catch (e) { console.warn("renderCategorias:", e); }
-            try { renderCategoriasSelect(); } catch (e) { console.warn("renderCategoriasSelect:", e); }
-            try { renderBanners(); } catch (e) { console.warn("renderBanners:", e); }
-            try { aplicarLayout(); } catch (e) { console.warn("aplicarLayout:", e); }
-            try { aplicarManifestPWA(); } catch (e) { console.warn("aplicarManifestPWA:", e); }
-            try { aplicarOpenGraph(); } catch (e) { console.warn("aplicarOpenGraph:", e); }
-            try { renderHeroSlider(); } catch (e) { console.warn("renderHeroSlider:", e); }
-            try { cargarFormConfig(); } catch (e) { console.warn("cargarFormConfig:", e); }
-        }, e => console.warn(`CLIENTE / ${firebaseConfig.projectId} / config/tienda:`, e));
+        suscribirConfigTienda(slug, firebaseConfig);
 
     } catch (e) {
         mostrarErrorSlug(errorFirebaseDetalle(e, "RESOLUCIÓN DE TIENDA"));
@@ -241,6 +320,7 @@ async function bootstrap() {
 
 
 let prods = [];
+let productosListos = false; // true cuando llegó el primer dato real (o del caché) de productos
 let cart = [];
 let users = [];
 let orders = [];
@@ -417,6 +497,19 @@ function init() {
 
     // Productos y slider son los únicos datos que necesita la parte pública.
     // Usuarios y pedidos se cargan recién cuando hay un administrador.
+    const slugCache = STORE_CONFIG.storeId;
+    const prodsCache = leerCacheLS("tu_tienda_prods_" + slugCache);
+    if (Array.isArray(prodsCache) && prodsCache.length) {
+        prods = prodsCache;
+        productosListos = true;
+        try { render(); } catch (e) { console.warn("render (caché):", e); }
+    }
+    const heroCache = leerCacheLS("tu_tienda_hero_" + slugCache);
+    if (Array.isArray(heroCache) && heroCache.length) {
+        heroImages = heroCache;
+        try { renderHeroSlider(); } catch (e) { console.warn("hero (caché):", e); }
+    }
+
     db.collection("productos").onSnapshot(snap => {
         prods = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         prods.forEach(p => {
@@ -424,6 +517,8 @@ function init() {
             p.imagenes = [...new Set(base.map(u => String(u || '').trim()).filter(Boolean))];
             if (typeof p.stock === 'undefined') p.stock = 10;
         });
+        productosListos = true;
+        guardarCacheLS("tu_tienda_prods_" + slugCache, prods);
         render();
         if (esAdmin) renderAdmP();
         poblarFiltroCompatibilidad();
@@ -438,6 +533,7 @@ function init() {
             const bo = Number.isFinite(Number(b.order)) ? Number(b.order) : Number.MAX_SAFE_INTEGER;
             return ao - bo || a._fallbackOrder - b._fallbackOrder;
         });
+        guardarCacheLS("tu_tienda_hero_" + slugCache, heroImages);
         renderHeroSlider();
         if (esAdmin) renderAdmSlider();
     }, err => console.warn("hero:", err.code || err));
@@ -977,6 +1073,9 @@ function cambiarFiltroMarca() {
 }
 
 function render() {
+    // Mientras todavía no llegaron los productos, se deja el esqueleto de carga
+    // en vez de mostrar "No se encontraron productos..." por un instante.
+    if (!productosListos && prods.length === 0) return;
     const query = document.getElementById("searchInput").value.toLowerCase().trim();
     const cont = document.getElementById("productsCont");
     const marcaSel = document.getElementById("filtroMarca");
@@ -996,7 +1095,7 @@ function render() {
         return;
     }
 
-    cont.innerHTML = filtered.map(p => {
+    cont.innerHTML = filtered.map((p, idxCard) => {
         const precioActual = isMay ? (p.precio_may || p.precio) : p.precio;
         const firstImg = p.imagenes && p.imagenes.length > 0 ? p.imagenes[0] : (p.imagen || 'https://placehold.co/300x300?text=Sin+imagen');
         const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
@@ -1009,7 +1108,7 @@ function render() {
                 ${p.nuevo ? `<div class="badge-nuevo">🆕 NUEVO</div>` : ''}
                 <div class="img-box">
                     ${sinStock ? `<div class="badge-agotado-overlay"><span>SIN STOCK</span></div>` : ''}
-                    <img src="${firstImg}" alt="${p.nombre}" loading="lazy">
+                    <img src="${miniaturaImg(firstImg, 500)}" alt="${p.nombre}" loading="${idxCard < 6 ? 'eager' : 'lazy'}" decoding="async">
                 </div>
                 <div class="info-box">
                     <div class="prod-title">${p.nombre}</div>
