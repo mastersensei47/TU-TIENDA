@@ -2608,11 +2608,12 @@ async function guardarConfigTienda() {
 // ==================== NAVEGACIÓN DEL PANEL / CATEGORÍAS ====================
 
 function tab(id, e) {
-    document.querySelectorAll("#t-prod, #t-user, #t-order, #t-slider, #t-stats, #t-config").forEach(el => el.style.display = "none");
+    document.querySelectorAll("#t-prod, #t-user, #t-order, #t-slider, #t-stats, #t-debt, #t-config").forEach(el => el.style.display = "none");
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.getElementById(id).style.display = "block";
     if (id === "t-prod") renderAdmP();
     if (id === "t-slider") renderAdmSlider();
+    if (id === "t-debt" && window.Deudas) window.Deudas.iniciar("admDeudas");
     if (e && e.target) {
         e.target.classList.add("active");
     } else {
