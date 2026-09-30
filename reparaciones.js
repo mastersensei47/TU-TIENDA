@@ -348,6 +348,7 @@ function init() {
                 esAdmin = true;
                 mostrarApp();
                 cargarReparaciones();
+                cargarAjustesFinanzas();
                 cargarFormConfigTaller();
             } else {
                 const emailUsado = user.email;
@@ -681,18 +682,73 @@ const ESTADOS = {
     entregado:      { label: "Entregado",           color: "var(--success)" }
 };
 
+// ==================== GANANCIA: QUÉ CUENTA Y QUÉ SE APARTA ====================
+// Cada trabajo puede contar (o no) en la "Ganancia total":
+//   siempre        → cuenta desde que se carga (comportamiento de siempre)
+//   en_reparacion  → recién cuando deje de estar "Pendiente"
+//   listo          → recién cuando esté "Listo para retirar"
+//   entregado      → recién cuando esté "Entregado"
+//   no             → no cuenta nunca (queda "apartada", con su motivo)
+// Lo que no cuenta se puede ordenar en APARTADOS (como en una caja de ahorro).
+const ORDEN_ESTADOS = { pendiente: 0, en_reparacion: 1, listo: 2, entregado: 3 };
+const APARTADOS_DEFAULT = [
+    { id: "reinversion", nombre: "Reinversión / reposición", icono: "🔁" },
+    { id: "ahorro", nombre: "Ahorro", icono: "🏦" },
+    { id: "personal", nombre: "Uso personal", icono: "👤" },
+    { id: "pendiente_cobro", nombre: "Pendiente de cobro", icono: "⏳" }
+];
+const MOTIVOS_SUGERIDOS = [
+    "Pago a cuenta / seña", "Reservado para comprar repuestos", "Cliente todavía no pagó",
+    "Trabajo en garantía", "Plata de un tercero", "Préstamo / adelanto"
+];
+let apartadosGuardados = null;
+
+function apartadosLista() {
+    return Array.isArray(apartadosGuardados) ? apartadosGuardados : APARTADOS_DEFAULT;
+}
+
+function nombreApartado(id) {
+    const a = apartadosLista().find(x => x.id === id);
+    return a ? `${a.icono || "📁"} ${a.nombre}` : "Sin apartado";
+}
+
+function cuentaComoGanancia(r) {
+    const modo = r.cuentaGanancia || "siempre";
+    if (modo === "siempre") return true;
+    if (modo === "no") return false;
+    return (ORDEN_ESTADOS[r.estado] ?? 0) >= (ORDEN_ESTADOS[modo] ?? 0);
+}
+
+function textoCondicionGanancia(r) {
+    const modo = r.cuentaGanancia || "siempre";
+    if (modo === "no") return "No cuenta como ganancia";
+    if (modo === "siempre") return "";
+    return `Cuenta cuando esté «${(ESTADOS[modo] || {}).label || modo}»`;
+}
+
+function cargarAjustesFinanzas() {
+    db.collection("ajustes").doc("finanzas").onSnapshot(snap => {
+        apartadosGuardados = (snap.exists && Array.isArray(snap.data().apartados)) ? snap.data().apartados : null;
+        renderStats();
+        renderLista();
+        if (document.getElementById("apartadosModal")?.style.display === "flex") renderApartados();
+        rellenarSelectApartado(document.getElementById("rApartado")?.value || "");
+    }, err => console.warn("ajustes/finanzas:", err.code));
+}
+
 function renderStats() {
     const ahora = new Date();
-    let gananciaTotal = 0, pendientes = 0, delMes = 0, gananciaMes = 0, urgentes = 0;
+    let gananciaTotal = 0, pendientes = 0, delMes = 0, gananciaMes = 0, urgentes = 0, noCuenta = 0;
 
     reparaciones.forEach(r => {
-        gananciaTotal += (r.ganancia || 0);
+        const cuenta = cuentaComoGanancia(r);
+        if (cuenta) gananciaTotal += (r.ganancia || 0); else noCuenta += (r.ganancia || 0);
         if (r.estado === 'pendiente' || r.estado === 'en_reparacion') pendientes++;
         if (r.prioridad === 'urgente' && r.estado !== 'entregado') urgentes++;
         const f = new Date(r.fechaIngreso);
         if (f.getMonth() === ahora.getMonth() && f.getFullYear() === ahora.getFullYear()) {
             delMes++;
-            gananciaMes += (r.ganancia || 0);
+            if (cuenta) gananciaMes += (r.ganancia || 0);
         }
     });
 
@@ -701,6 +757,7 @@ function renderStats() {
     conElRep("statMes", el => el.innerText = delMes);
     conElRep("statGananciaMes", el => el.innerText = "$" + gananciaMes.toFixed(0));
     conElRep("statUrgentes", el => el.innerText = urgentes);
+    conElRep("statNoCuenta", el => el.innerText = "$" + noCuenta.toFixed(0));
 }
 
 function renderLista() {
@@ -740,11 +797,12 @@ function renderLista() {
                     </div>
                 </div>
                 <div style="text-align:right;">
-                    <div style="font-weight:800; color:var(--success);">$${(r.ganancia || 0).toFixed(0)}</div>
-                    <small style="opacity:0.5;">ganancia</small>
+                    <div style="font-weight:800; color:${cuentaComoGanancia(r) ? 'var(--success)' : 'var(--promo)'};">$${(r.ganancia || 0).toFixed(0)}</div>
+                    <small style="opacity:0.5;">${cuentaComoGanancia(r) ? 'ganancia' : 'no cuenta aún'}</small>
                 </div>
             </div>
             ${r.problema ? `<div style="margin-top:10px; font-size:13px; opacity:0.8;">${r.problema}</div>` : ''}
+            ${!cuentaComoGanancia(r) ? `<div style="margin-top:8px; font-size:12px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:10px; padding:7px 10px;">⏸ ${textoCondicionGanancia(r)}${r.motivoNoCuenta ? ' — ' + escRep(r.motivoNoCuenta) : ''}${r.apartado ? ' · ' + escRep(nombreApartado(r.apartado)) : ''}</div>` : ''}
             ${r.garantiaDias ? `<div style="margin-top:8px; font-size:11px; opacity:0.55;">🛡️ Garantía: ${r.garantiaDias} días</div>` : ''}
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button onclick="editarReparacion('${r.id}')" style="flex:1; background:rgba(255,255,255,0.06); border:none; color:var(--text); padding:10px; border-radius:10px; cursor:pointer; font-weight:700;">✏️ Editar</button>
@@ -772,6 +830,10 @@ function abrirFormNuevo() {
     document.getElementById("rFechaEstimada").value = "";
     document.getElementById("rGarantiaDias").value = "";
     document.getElementById("rNotas").value = "";
+    document.getElementById("rCuentaGanancia").value = "siempre";
+    document.getElementById("rMotivoNoCuenta").value = "";
+    rellenarSelectApartado("");
+    actualizarCamposApartado();
     actualizarGananciaPreview();
     document.getElementById("formModal").style.display = "flex";
 }
@@ -794,6 +856,10 @@ function editarReparacion(id) {
     document.getElementById("rFechaEstimada").value = r.fechaEstimada || "";
     document.getElementById("rGarantiaDias").value = r.garantiaDias || "";
     document.getElementById("rNotas").value = r.notas || "";
+    document.getElementById("rCuentaGanancia").value = r.cuentaGanancia || "siempre";
+    document.getElementById("rMotivoNoCuenta").value = r.motivoNoCuenta || "";
+    rellenarSelectApartado(r.apartado || "");
+    actualizarCamposApartado();
     actualizarGananciaPreview();
     document.getElementById("formModal").style.display = "flex";
 }
@@ -839,6 +905,12 @@ async function guardarReparacion() {
         notas: document.getElementById("rNotas").value.trim()
     };
 
+    // ¿Cuenta en la ganancia total? (si cuenta siempre, se limpian apartado y motivo)
+    const cuentaGanancia = document.getElementById("rCuentaGanancia").value || "siempre";
+    datos.cuentaGanancia = cuentaGanancia;
+    datos.apartado = cuentaGanancia === "siempre" ? null : (document.getElementById("rApartado").value || null);
+    datos.motivoNoCuenta = cuentaGanancia === "siempre" ? "" : document.getElementById("rMotivoNoCuenta").value.trim();
+
     try {
         if (editandoId) {
             await db.collection("reparaciones").doc(editandoId).update(datos);
@@ -868,7 +940,7 @@ async function borrarReparacion(id) {
 function exportarReparacionesCSV() {
     if (reparaciones.length === 0) return alert("No hay registros para exportar.");
     const p = presetRubro();
-    const filas = [["Fecha ingreso", "Cliente", "Teléfono", p.campoObjeto, "Detalle", "Costo total", "Precio cobrado", "Ganancia", "Estado", "Prioridad"]];
+    const filas = [["Fecha ingreso", "Cliente", "Teléfono", p.campoObjeto, "Detalle", "Costo total", "Precio cobrado", "Ganancia", "Cuenta en ganancia total", "Apartado", "Motivo", "Estado", "Prioridad"]];
     reparaciones.forEach(r => {
         filas.push([
             r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-ES') : '',
@@ -879,6 +951,9 @@ function exportarReparacionesCSV() {
             r.costoTotal || 0,
             r.precioCobrado || 0,
             r.ganancia || 0,
+            cuentaComoGanancia(r) ? 'Sí' : (textoCondicionGanancia(r) || 'No'),
+            (!cuentaComoGanancia(r) && r.apartado) ? nombreApartado(r.apartado) : '',
+            r.motivoNoCuenta || '',
             (ESTADOS[r.estado] || {}).label || r.estado || '',
             r.prioridad === 'urgente' ? 'Urgente' : 'Normal'
         ]);
@@ -901,5 +976,133 @@ function exportarReparacionesCSV() {
         if (e.target && e.target.id === id) actualizarGananciaPreview();
     });
 });
+
+// ==================== APARTADOS (lo que no cuenta como ganancia total) ====================
+
+function escRep(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Campos del formulario: solo se muestran apartado y motivo si el trabajo NO cuenta siempre
+function rellenarSelectApartado(valor) {
+    const sel = document.getElementById("rApartado");
+    if (!sel) return;
+    const lista = apartadosLista();
+    sel.innerHTML = `<option value="">Sin apartado</option>` +
+        lista.map(a => `<option value="${escRep(a.id)}">${escRep((a.icono || "📁") + " " + a.nombre)}</option>`).join("");
+    sel.value = lista.some(a => a.id === valor) ? valor : "";
+}
+
+function actualizarCamposApartado() {
+    const modo = document.getElementById("rCuentaGanancia").value;
+    const box = document.getElementById("rApartadoBox");
+    if (box) box.style.display = modo === "siempre" ? "none" : "block";
+}
+
+function abrirApartados() {
+    renderApartados();
+    document.getElementById("apartadosModal").style.display = "flex";
+}
+
+function cerrarApartados() {
+    document.getElementById("apartadosModal").style.display = "none";
+}
+
+function renderApartados() {
+    const cont = document.getElementById("apartadosCont");
+    if (!cont) return;
+    const noContadas = reparaciones.filter(r => !cuentaComoGanancia(r));
+    const suma = arr => arr.reduce((a, r) => a + (r.ganancia || 0), 0);
+    const lista = apartadosLista();
+    const conocidos = new Set(lista.map(a => a.id));
+
+    const grupos = lista.map(a => ({
+        id: a.id,
+        titulo: `${a.icono || "📁"} ${a.nombre}`,
+        items: noContadas.filter(r => r.apartado === a.id),
+        borrable: true
+    }));
+    grupos.push({
+        id: "",
+        titulo: "Sin apartado",
+        items: noContadas.filter(r => !r.apartado || !conocidos.has(r.apartado)),
+        borrable: false
+    });
+
+    const filaItem = r => `
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:center; padding:10px 0; border-bottom:1px solid rgba(255,255,255,.06);">
+            <div style="min-width:0; font-size:13px;">
+                <b>${escRep(r.cliente || "Sin nombre")}</b> — ${escRep(r.equipo || "")}
+                <div style="opacity:.6; font-size:12px; margin-top:2px;">${escRep(textoCondicionGanancia(r))}${r.motivoNoCuenta ? " — " + escRep(r.motivoNoCuenta) : ""}</div>
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+                <b>$${(r.ganancia || 0).toFixed(0)}</b><br>
+                <button type="button" onclick="contarAhora('${r.id}')" style="margin-top:4px; background:rgba(16,185,129,.15); border:1px solid rgba(16,185,129,.4); color:var(--success); padding:5px 10px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;">Contar ya</button>
+            </div>
+        </div>`;
+
+    cont.innerHTML = `
+        <div style="background:rgba(255,255,255,0.05); border-radius:16px; padding:16px; text-align:center; margin-bottom:18px;">
+            <small style="opacity:.55; font-weight:700; font-size:11px; letter-spacing:.5px;">TOTAL QUE NO CUENTA (POR AHORA)</small>
+            <div style="font-size:26px; font-weight:800; color:var(--promo); margin-top:4px;">$${suma(noContadas).toFixed(0)}</div>
+            <small style="opacity:.45;">${noContadas.length} ${noContadas.length === 1 ? "trabajo" : "trabajos"}</small>
+        </div>
+
+        ${grupos.map(g => `
+        <details style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:12px 14px; margin-bottom:10px;" ${g.items.length ? "open" : ""}>
+            <summary style="cursor:pointer; display:flex; justify-content:space-between; gap:10px; font-weight:700; list-style:none;">
+                <span>${escRep(g.titulo)}</span>
+                <span>$${suma(g.items).toFixed(0)} <small style="opacity:.5;">(${g.items.length})</small></span>
+            </summary>
+            <div style="margin-top:8px;">
+                ${g.items.length ? g.items.map(filaItem).join("") : `<p style="opacity:.45; font-size:12px; margin:8px 0;">Nada apartado acá todavía.</p>`}
+                ${g.borrable ? `<button type="button" onclick="borrarApartado('${escRep(g.id)}')" style="margin-top:10px; background:none; border:none; color:var(--danger); font-size:12px; cursor:pointer; opacity:.8;">🗑️ Eliminar este apartado</button>` : ""}
+            </div>
+        </details>`).join("")}
+
+        <div style="background:rgba(255,255,255,.035); padding:15px; border-radius:14px; margin-top:18px;">
+            <label style="display:block; font-size:11px; opacity:.5; font-weight:800; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">➕ Crear apartado nuevo</label>
+            <div style="display:grid; grid-template-columns:1fr 90px; gap:10px;">
+                <input id="apNombre" placeholder="Nombre (ej: Alquiler, Vacaciones)">
+                <input id="apIcono" placeholder="Ícono 📁" maxlength="4" style="text-align:center;">
+            </div>
+            <button type="button" class="btn-add" style="background:var(--accent); margin-top:10px;" onclick="agregarApartado()">+ CREAR APARTADO</button>
+        </div>`;
+}
+
+async function guardarApartados(lista) {
+    try {
+        await db.collection("ajustes").doc("finanzas").set({ apartados: lista }, { merge: true });
+    } catch (e) {
+        console.error(e);
+        alert("No se pudo guardar el apartado: " + (e.message || e));
+    }
+}
+
+async function agregarApartado() {
+    const nombre = document.getElementById("apNombre").value.trim();
+    if (!nombre) return alert("Escribí el nombre del apartado.");
+    const icono = document.getElementById("apIcono").value.trim() || "📁";
+    await guardarApartados([...apartadosLista(), { id: "a" + Date.now().toString(36), nombre, icono }]);
+}
+
+async function borrarApartado(id) {
+    const a = apartadosLista().find(x => x.id === id);
+    if (!a) return;
+    if (!confirm(`¿Eliminar el apartado "${a.nombre}"? Los trabajos que estaban ahí siguen sin contar, pero pasan a "Sin apartado".`)) return;
+    await guardarApartados(apartadosLista().filter(x => x.id !== id));
+}
+
+async function contarAhora(id) {
+    const r = reparaciones.find(x => x.id === id);
+    if (!r) return;
+    if (!confirm(`¿Contar ya la ganancia de "${r.cliente || "este trabajo"}" en la ganancia total?`)) return;
+    try {
+        await db.collection("reparaciones").doc(id).update({ cuentaGanancia: "siempre", apartado: null, motivoNoCuenta: "" });
+    } catch (e) {
+        console.error(e);
+        alert("No se pudo actualizar: " + (e.message || e));
+    }
+}
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootstrap); else bootstrap();
