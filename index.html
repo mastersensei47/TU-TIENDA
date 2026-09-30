@@ -184,6 +184,7 @@
             <button class="tab-btn" onclick="tab('t-user', event)">CLIENTES</button>
             <button class="tab-btn" onclick="tab('t-order', event)">HISTORIAL</button>
             <button class="tab-btn" onclick="tab('t-stats', event)">ESTADÍSTICAS</button>
+            <button class="tab-btn" onclick="tab('t-debt', event)">DEUDORES</button>
             <button class="tab-btn" onclick="tab('t-slider', event)">SLIDER HERO</button>
             <button class="tab-btn" onclick="tab('t-config', event)">CONFIGURACIÓN</button>
         </div>
@@ -266,6 +267,10 @@
 
         <div id="t-stats" style="display:none;">
             <div id="admStats"></div>
+        </div>
+
+        <div id="t-debt" style="display:none;">
+            <div id="admDeudas"></div>
         </div>
 
         <div id="t-slider" style="display:none;">
@@ -693,6 +698,7 @@
 </div>
 
 <script src="config.js" defer></script>
-<script src="app.js?v=20260907-multistore" defer></script>
+<script src="deudas.js?v=20260929-deudas" defer></script>
+<script src="app.js?v=20260929-deudas" defer></script>
 </body>
 </html>
