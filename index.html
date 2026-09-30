@@ -56,7 +56,7 @@
         }
     })();
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 </head>
 <body class="dark">
 
@@ -114,7 +114,10 @@
 </div>
 
 
-<div class="products-grid" id="productsCont"></div>
+<div class="products-grid" id="productsCont">
+    <style>@keyframes skelPulse{0%,100%{opacity:.35}50%{opacity:.7}}.skel-card{height:320px;border-radius:var(--radius,18px);background:rgba(255,255,255,0.06);animation:skelPulse 1.3s ease-in-out infinite}</style>
+    <div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div>
+</div>
 
 <div id="toast">✅ Producto agregado al carrito</div>
 <div id="imageModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;z-index:9000;" onclick="if(event.target.id==='imageModal')this.style.display='none';">
@@ -699,6 +702,6 @@
 
 <script src="config.js" defer></script>
 <script src="deudas.js?v=20260929-deudas" defer></script>
-<script src="app.js?v=20260929-deudas" defer></script>
+<script src="app.js?v=20260930-rapido" defer></script>
 </body>
 </html>
