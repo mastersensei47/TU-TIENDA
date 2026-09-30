@@ -1516,12 +1516,35 @@ async function doLogin() {
     const p = document.getElementById("pInp").value.trim();
     if (!u || !p) return alert("Completá usuario y contraseña");
     try {
-        await auth.signInWithEmailAndPassword(toAuthEmail(u), p);
+        await auth.signInWithEmailAndPassword(await emailParaLogin(u), p);
         closeAll();
     } catch (e) {
         console.error(e);
         alert("Usuario o contraseña incorrectos.");
     }
+}
+
+// Clave interna de un nombre de usuario (minúsculas y sin espacios): es la
+// parte de adelante del "email interno" que se usa con Firebase Auth.
+function claveUsuario(u) {
+    return String(u || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+// Cuando el administrador restablece el acceso de un cliente, la cuenta pasa
+// a tener un email interno nuevo (guardado en su perfil como authEmail).
+// Los clientes que nunca fueron restablecidos siguen usando el de siempre.
+async function emailParaLogin(u) {
+    if (u.includes("@")) return u.toLowerCase();
+    try {
+        const q = await db.collection("usuarios").where("userKey", "==", claveUsuario(u)).limit(1).get();
+        if (!q.empty) {
+            const d = q.docs[0].data() || {};
+            if (d.authEmail) return d.authEmail;
+        }
+    } catch (e) {
+        console.warn("emailParaLogin:", e);
+    }
+    return toAuthEmail(u);
 }
 
 async function recuperarClave() {
@@ -2114,6 +2137,155 @@ function ayudaContrasenaOlvidada(username) {
     alert(mensaje);
 }
 
+// Clave temporal legible (sin letras/números que se confunden: 0/O, 1/l/I).
+function generarClaveTemporal(largo = 8) {
+    const abc = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const buf = new Uint32Array(largo);
+    (window.crypto || window.msCrypto).getRandomValues(buf);
+    return Array.from(buf, n => abc[n % abc.length]).join("");
+}
+
+// ==== RESTABLECER EL ACCESO DE UN CLIENTE (sin tocar la consola de Firebase) ====
+// Firebase no deja VER ni cambiar la contraseña de otra persona desde el
+// navegador (y guardarlas en texto plano sería un riesgo enorme: bastaría un
+// error en las reglas para exponer las de todos tus clientes). Lo que sí se
+// puede hacer sin servidor: crear una cuenta nueva para el mismo cliente con
+// una contraseña temporal que elige el administrador, pasarle su perfil y sus
+// pedidos, y que el cliente la cambie apenas entre (botón "Cambiar mi
+// contraseña" en su perfil). La cuenta vieja queda sin uso (no se puede
+// borrar desde el navegador, pero ya no tiene perfil ni acceso a nada).
+async function restablecerAcceso(id) {
+    const u = users.find(x => x.id === id);
+    if (!u) return;
+    const temporal = prompt(
+        `Restablecer el acceso de "${u.user}".\n\nEscribí una contraseña temporal (mínimo 6 caracteres) o dejá la que sugerimos. ` +
+        `Después pasásela al cliente: apenas entre puede cambiarla desde su perfil.`,
+        generarClaveTemporal()
+    );
+    if (temporal === null) return;
+    const clave = temporal.trim();
+    if (clave.length < 6) return alert("La contraseña debe tener al menos 6 caracteres.");
+
+    const base = toAuthEmail(u.user);
+    const [local, dominio] = base.split("@");
+    let app2 = null;
+    let nuevoUid = null, nuevoEmail = null;
+    try {
+        // Segunda conexión a Firebase, para no cerrar la sesión del administrador.
+        app2 = firebase.initializeApp(clienteApp.options, "reset_" + Date.now());
+        const auth2 = firebase.auth(app2);
+        try { await auth2.setPersistence(firebase.auth.Auth.Persistence.NONE); } catch (_) {}
+        for (let n = 2; n <= 30 && !nuevoUid; n++) {
+            const candidato = `${local}+r${n}@${dominio}`;
+            try {
+                const cred = await auth2.createUserWithEmailAndPassword(candidato, clave);
+                nuevoUid = cred.user.uid;
+                nuevoEmail = candidato;
+            } catch (e) {
+                if (e.code !== "auth/email-already-in-use") throw e;
+            }
+        }
+        if (!nuevoUid) throw new Error("No se pudo generar una cuenta nueva para este usuario.");
+        try { await auth2.signOut(); } catch (_) {}
+    } catch (e) {
+        console.error(e);
+        try { if (app2) await app2.delete(); } catch (_) {}
+        if (e.code === "auth/weak-password") return alert("La contraseña es muy débil (mínimo 6 caracteres).");
+        if (e.code === "auth/operation-not-allowed") return alert("El login por usuario/contraseña no está habilitado en este proyecto de Firebase.");
+        return alert("No se pudo restablecer el acceso: " + (e.message || e));
+    }
+    try { await app2.delete(); } catch (_) {}
+
+    try {
+        // El perfil nuevo se crea inactivo (lo exigen las reglas) y se activa enseguida.
+        await db.collection("usuarios").doc(nuevoUid).set({
+            user: u.user, tel: u.tel || "", dir: u.dir || "", activo: false,
+            fecha: u.fecha || Date.now(), userKey: claveUsuario(u.user), authEmail: nuevoEmail, restablecido: Date.now()
+        });
+        await db.collection("usuarios").doc(nuevoUid).update({ activo: true });
+    } catch (e) {
+        console.error(e);
+        return alert("Se creó la cuenta nueva pero no se pudo guardar el perfil (" + (e.code || e.message || e) + "). El cliente sigue con su acceso anterior. Probá de nuevo: no se pierde nada.");
+    }
+
+    // Pedidos anteriores: pasan a la cuenta nueva para que el cliente vea su historial.
+    let pedidosOk = true;
+    try {
+        const snap = await db.collection("pedidos").where("clienteUid", "==", id).get();
+        if (!snap.empty) {
+            const batch = db.batch();
+            snap.forEach(d => batch.update(d.ref, { clienteUid: nuevoUid }));
+            await batch.commit();
+        }
+    } catch (e) {
+        console.warn("No se pudieron pasar los pedidos:", e);
+        pedidosOk = false;
+    }
+
+    try { await db.collection("usuarios").doc(id).delete(); }
+    catch (e) { console.warn("No se pudo borrar el perfil anterior:", e); }
+
+    let msg = `✅ Listo. "${u.user}" ya puede entrar con la contraseña temporal:\n\n${clave}\n\nRecomendale que la cambie desde su perfil (🔒 Cambiar mi contraseña).`;
+    if (!pedidosOk) msg += `\n\n⚠️ Sus pedidos anteriores no se pudieron vincular a la cuenta nueva (revisá que tengas publicadas las reglas de Firestore más recientes). Siguen en tu historial.`;
+    alert(msg);
+
+    const tel = String(u.tel || "").replace(/\D/g, "");
+    if (tel && confirm("¿Querés mandarle la contraseña temporal por WhatsApp?")) {
+        const texto = `Hola ${u.user}! Te restablecimos el acceso a ${STORE_CONFIG.storeName || "la tienda"}. ` +
+            `Tu usuario es: ${u.user} y tu contraseña temporal es: ${clave}\n` +
+            `Entrá y cambiala desde tu perfil (Cambiar mi contraseña).`;
+        window.open("https://wa.me/" + tel + "?text=" + encodeURIComponent(texto), "_blank");
+    }
+}
+
+// ==== CAMBIAR MI CONTRASEÑA (cliente logueado) ====
+function abrirCambioClave() {
+    if (!auth.currentUser || !usuarioLogueado) return alert("Iniciá sesión para cambiar tu contraseña.");
+    let m = document.getElementById("claveModal");
+    if (!m) {
+        m = document.createElement("div");
+        m.className = "modal";
+        m.id = "claveModal";
+        m.innerHTML = `
+        <div class="modal-content" style="max-width:420px; width:100%; margin:auto; padding:25px;">
+            <h3 style="margin-top:0;">🔒 Cambiar mi contraseña</h3>
+            <div class="form-group"><label>Contraseña actual</label><input id="claveActual" type="password" autocomplete="current-password"></div>
+            <div class="form-group"><label>Contraseña nueva (mín. 6 caracteres)</label><input id="claveNueva" type="password" autocomplete="new-password"></div>
+            <div class="form-group"><label>Repetí la contraseña nueva</label><input id="claveNueva2" type="password" autocomplete="new-password"></div>
+            <button class="btn-add" style="background:var(--success);" onclick="cambiarMiClave()">GUARDAR</button>
+            <button class="btn-add" style="background:none; color:white; margin-top:10px; opacity:0.6;" onclick="document.getElementById('claveModal').style.display='none'">Cancelar</button>
+        </div>`;
+        document.body.appendChild(m);
+    }
+    ["claveActual", "claveNueva", "claveNueva2"].forEach(i => document.getElementById(i).value = "");
+    m.style.display = "flex";
+}
+
+async function cambiarMiClave() {
+    const user = auth.currentUser;
+    if (!user) return alert("Iniciá sesión para cambiar tu contraseña.");
+    const actual = document.getElementById("claveActual").value;
+    const nueva = document.getElementById("claveNueva").value;
+    const nueva2 = document.getElementById("claveNueva2").value;
+    if (!actual || !nueva) return alert("Completá todos los campos.");
+    if (nueva.length < 6) return alert("La contraseña nueva debe tener al menos 6 caracteres.");
+    if (nueva !== nueva2) return alert("Las contraseñas nuevas no coinciden.");
+    if (nueva === actual) return alert("La contraseña nueva tiene que ser distinta de la actual.");
+    try {
+        const cred = firebase.auth.EmailAuthProvider.credential(user.email, actual);
+        await user.reauthenticateWithCredential(cred);
+        await user.updatePassword(nueva);
+        document.getElementById("claveModal").style.display = "none";
+        alert("✅ Contraseña cambiada. La próxima vez entrá con la nueva.");
+    } catch (e) {
+        console.error(e);
+        if (["auth/wrong-password", "auth/invalid-credential", "auth/invalid-login-credentials"].includes(e.code)) alert("La contraseña actual no es correcta.");
+        else if (e.code === "auth/weak-password") alert("La contraseña nueva es muy débil.");
+        else if (e.code === "auth/too-many-requests") alert("Demasiados intentos. Esperá unos minutos y probá de nuevo.");
+        else alert("No se pudo cambiar la contraseña" + (e.code ? " (" + e.code + ")" : "") + ".");
+    }
+}
+
 function renderAdmU() {
     const list = document.getElementById("admListU");
     const pen = users.filter(u => !u.activo);
@@ -2148,7 +2320,7 @@ function renderAdmU() {
                 </div>
             </div>
             <div style="display:flex; flex-direction:column; gap:6px; align-self:center;">
-                <button onclick="ayudaContrasenaOlvidada('${u.user}')" title="Olvidó su contraseña" style="background:none; border:none; font-size:18px; cursor:pointer;">🔑</button>
+                <button onclick="restablecerAcceso('${u.id}')" title="Restablecer contraseña" style="background:none; border:none; font-size:18px; cursor:pointer;">🔑</button>
                 <button onclick="del('usuarios','${u.id}')" style="color:var(--danger); font-size:18px; background:none; border:none; cursor:pointer;">🗑️</button>
             </div>
         </div>
@@ -2166,9 +2338,12 @@ function renderAdmO() {
     }
     list.innerHTML = orders.map(o => `
         <div class="admin-item" style="flex-direction:column; align-items:flex-start;">
-            <div class="flex-between" style="width:100%;">
+            <div class="flex-between" style="width:100%; align-items:center; gap:10px;">
                 <b style="color:var(--accent);">${o.total}</b>
-                <small>${new Date(o.fecha).toLocaleString('es-ES')}</small>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <small>${new Date(o.fecha).toLocaleString('es-ES')}</small>
+                    <button onclick="borrarPedido('${o.id}')" title="Borrar este pedido" style="color:var(--danger); font-size:18px; background:none; border:none; cursor:pointer; padding:2px 6px;">🗑️</button>
+                </div>
             </div>
             ${o.clienteUid ? `
                 <select onchange="cambiarEstadoPedido('${o.id}', this.value)" style="margin-top:8px; padding:8px 10px; border-radius:8px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.15); font-size:12px; font-weight:700;">
@@ -2181,6 +2356,16 @@ function renderAdmO() {
             </div>
         </div>
     `).join("");
+}
+
+async function borrarPedido(id) {
+    if (!confirm("¿Borrar este pedido del historial? No se puede deshacer.")) return;
+    try {
+        await db.collection("pedidos").doc(id).delete();
+    } catch (e) {
+        console.error(e);
+        alert("No se pudo borrar el pedido: " + (e.message || e));
+    }
 }
 
 async function cambiarEstadoPedido(id, nuevoEstado) {
