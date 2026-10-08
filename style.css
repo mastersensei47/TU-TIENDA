@@ -816,3 +816,98 @@ body.estilo-fotos .cat-grid {
 }
 @media (max-width: 700px) { .cat-photo span { font-size: 15px; } }
 .cat-photo.active { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+
+/* ==================== DESCUENTO EN LAS TARJETAS DEL CATÁLOGO ==================== */
+.price-old-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.price-old { color: #94a3b8; text-decoration: line-through; font-size: 14px; }
+.badge-off { color: #ff1f3d; font-weight: 800; font-size: 13px; }
+
+/* ==================== ESTILO: LIQUIDACIÓN Y OFERTAS (CARRUSEL) ==================== */
+.of-sec { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+.of-sec:empty { display: none; }
+.of-head h2 { margin: 6px 0 14px; font-size: 22px; font-weight: 800; color: var(--text); }
+.of-wrap { position: relative; }
+.of-track {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 2px 18px;
+}
+.of-track::-webkit-scrollbar { display: none; }
+.of-card {
+    flex: 0 0 230px;
+    scroll-snap-align: start;
+    background: #f1f2f4;
+    color: #1f2937;
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    cursor: pointer;
+}
+.of-img { height: 170px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+.of-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.of-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    min-height: 38px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: left;
+}
+.of-old { color: #9ca3af; text-decoration: line-through; font-size: 13px; margin-top: 8px; }
+.of-price-row { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 12px; flex-wrap: wrap; }
+.of-price { font-size: 22px; font-weight: 800; color: #111827; }
+.of-off { color: #ff1f3d; font-weight: 800; font-size: 14px; }
+.of-btn {
+    margin-top: auto;
+    width: 100%;
+    background: #e11d2e;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.of-btn:hover { background: #c81426; }
+.of-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+.of-arrow {
+    position: absolute;
+    top: 42%;
+    transform: translateY(-50%);
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: #111827;
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    z-index: 2;
+    transition: opacity 0.2s;
+}
+.of-prev { left: -12px; }
+.of-next { right: -12px; }
+.of-arrow.of-off-arrow { opacity: 0; pointer-events: none; }
+.of-sec.of-sin-scroll .of-arrow { display: none; }
+@media (max-width: 700px) {
+    .of-card { flex-basis: 165px; padding: 10px; }
+    .of-img { height: 130px; }
+    .of-price { font-size: 19px; }
+    .of-arrow { width: 36px; height: 36px; font-size: 17px; }
+    .of-prev { left: -6px; }
+    .of-next { right: -6px; }
+}
