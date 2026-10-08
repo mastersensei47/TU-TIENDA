@@ -667,6 +667,8 @@ function aplicarLayout() {
     document.body.classList.toggle("cart-style-modal", l.cartStyle === "modal");
     document.body.classList.toggle("glow-effect", !!l.glowEffect);
     document.body.classList.toggle("estilo-fotos", l.estiloTienda === "fotos");
+    document.body.classList.toggle("estilo-ofertas", l.estiloTienda === "ofertas");
+    try { renderOfertas(true); } catch (e) { console.warn("renderOfertas:", e); }
 }
 
 // ==================== PWA / INSTALACIÓN ====================
@@ -851,6 +853,90 @@ function renderCategoriasFotos() {
     cont.innerHTML = tarjeta("", "🗂️ Todos", "") +
         (STORE_CONFIG.categories || []).map(c => tarjeta(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim(), imagenDeCategoria(c))).join("");
 }
+
+// ==================== ESTILO: LIQUIDACIÓN Y OFERTAS (CARRUSEL) ====================
+// Un carrusel horizontal con flechas laterales arriba del catálogo, solo con
+// los productos que tienen "Precio anterior" mayor al precio actual. Cada
+// tarjeta: fondo gris claro, título a la izquierda, precio original tachado,
+// precio final en negrita con el % OFF en rojo y botón "Comprar" rojo de
+// ancho completo. Para el público mayorista no se muestra (el descuento se
+// calcula contra el precio de lista, que no es el que ven).
+
+// Devuelve { actual, anterior, pct } si el producto tiene un descuento real.
+function infoDescuento(p) {
+    if (isMay) return null;
+    const actual = Number(p.precio) || 0;
+    const anterior = Number(p.precioAnterior) || 0;
+    if (!(anterior > actual) || actual <= 0) return null;
+    const pct = Math.round((1 - actual / anterior) * 100);
+    return pct >= 1 ? { actual, anterior, pct } : null;
+}
+
+let ofertasFirma = "";
+function renderOfertas(forzar) {
+    const cont = document.getElementById("ofertasSec");
+    if (!cont) return;
+    if (estiloTiendaActual() !== "ofertas") { cont.innerHTML = ""; ofertasFirma = ""; return; }
+
+    const lista = prods
+        .map(p => ({ p, d: infoDescuento(p) }))
+        .filter(x => x.d)
+        .sort((a, b) => b.d.pct - a.d.pct)
+        .slice(0, 24);
+
+    // Si nada cambió no se reconstruye (así no se pierde la posición del carrusel).
+    const firma = lista.map(x => `${x.p.id}:${x.d.actual}:${x.d.anterior}:${x.p.stock}:${x.p.sinStock ? 1 : 0}`).join("|") + "|" + (STORE_CONFIG.currency || "");
+    if (!forzar && firma === ofertasFirma) return;
+    ofertasFirma = firma;
+
+    if (lista.length === 0) { cont.innerHTML = ""; return; }
+
+    const moneda = escHtml(STORE_CONFIG.currency || "$");
+    const tarjetas = lista.map(({ p, d }) => {
+        const img = (p.imagenes && p.imagenes[0]) || p.imagen || "https://placehold.co/300x300?text=Sin+imagen";
+        const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
+        const sinStock = p.sinStock || (!conVariantes && Number(p.stock) <= 0);
+        const id = escHtml(p.id);
+        const boton = sinStock
+            ? `<button class="of-btn" disabled>Sin stock</button>`
+            : `<button class="of-btn" onclick="event.stopPropagation(); ${conVariantes ? `showProductDetail('${id}')` : `addToCart('${id}', event)`}">${conVariantes ? "Ver opciones" : "Comprar"}</button>`;
+        return `
+        <div class="of-card" onclick="showProductDetail('${id}')">
+            <div class="of-img"><img src="${escHtml(miniaturaImg(img, 400))}" alt="${escHtml(p.nombre)}" loading="lazy" decoding="async"></div>
+            <div class="of-title">${escHtml(p.nombre)}</div>
+            <div class="of-old">${moneda}${d.anterior}</div>
+            <div class="of-price-row"><span class="of-price">${moneda}${d.actual}</span><span class="of-off">${d.pct}% OFF</span></div>
+            ${boton}
+        </div>`;
+    }).join("");
+
+    cont.innerHTML = `
+        <div class="of-head"><h2>🔥 Liquidación y ofertas</h2></div>
+        <div class="of-wrap">
+            <button class="of-arrow of-prev" onclick="scrollOfertas(-1)" aria-label="Anterior">←</button>
+            <div class="of-track" id="ofTrack" onscroll="actualizarFlechasOfertas()">${tarjetas}</div>
+            <button class="of-arrow of-next" onclick="scrollOfertas(1)" aria-label="Siguiente">→</button>
+        </div>`;
+    setTimeout(actualizarFlechasOfertas, 0);
+}
+
+function scrollOfertas(dir) {
+    const t = document.getElementById("ofTrack");
+    if (!t) return;
+    t.scrollBy({ left: dir * Math.max(220, Math.round(t.clientWidth * 0.8)), behavior: "smooth" });
+}
+
+function actualizarFlechasOfertas() {
+    const t = document.getElementById("ofTrack");
+    const cont = document.getElementById("ofertasSec");
+    if (!t || !cont) return;
+    const hayScroll = t.scrollWidth > t.clientWidth + 4;
+    cont.classList.toggle("of-sin-scroll", !hayScroll);
+    const prev = cont.querySelector(".of-prev"), next = cont.querySelector(".of-next");
+    if (prev) prev.classList.toggle("of-off-arrow", t.scrollLeft <= 2);
+    if (next) next.classList.toggle("of-off-arrow", t.scrollLeft + t.clientWidth >= t.scrollWidth - 2);
+}
+window.addEventListener("resize", () => { try { actualizarFlechasOfertas(); } catch (_) {} });
 
 function elegirCategoriaFoto(id) {
     filterCat = id;
@@ -1158,6 +1244,7 @@ function render() {
     // Mientras todavía no llegaron los productos, se deja el esqueleto de carga
     // en vez de mostrar "No se encontraron productos..." por un instante.
     if (!productosListos && prods.length === 0) return;
+    try { renderOfertas(); } catch (e) { console.warn("renderOfertas:", e); }
     const query = document.getElementById("searchInput").value.toLowerCase().trim();
     const cont = document.getElementById("productsCont");
     const marcaSel = document.getElementById("filtroMarca");
@@ -1183,6 +1270,7 @@ function render() {
         const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
         const sinStock = p.sinStock || (!conVariantes && Number(p.stock) <= 0);
         const bajoStock = !sinStock && !conVariantes && Number(p.stock) > 0 && Number(p.stock) < 3;
+        const desc = infoDescuento(p);
         return `
             <div class="product-card" data-id="${p.id}" onclick="if(!event.target.closest('.btn-add')) showProductDetail('${p.id}')">
                 ${p.promo ? `<div class="promo-badge">${p.promo}</div>` : ''}
@@ -1194,6 +1282,7 @@ function render() {
                 </div>
                 <div class="info-box">
                     <div class="prod-title">${p.nombre}</div>
+                    ${desc ? `<div class="price-old-row"><span class="price-old">${STORE_CONFIG.currency}${desc.anterior}</span><span class="badge-off">${desc.pct}% OFF</span></div>` : ''}
                     <div class="price-val">${STORE_CONFIG.currency}${precioActual}</div>
                     ${conVariantes ? '' : bajoStock ? `<div class="stock-info stock-bajo">⚡ ¡Solo quedan ${p.stock}!</div>` : `<div class="stock-info">Stock: ${p.stock} unidades</div>`}
                     ${sinStock && !conVariantes
@@ -1481,8 +1570,8 @@ function addToCart(id, evt) {
     else cart.push({id, qty: 1, variante: null});
     updateCartUI();
     vibrar();
-    const origenCard = evt && evt.target && evt.target.closest ? evt.target.closest('.product-card') : null;
-    animarAgregarCarrito(origenCard ? origenCard.querySelector('.img-box img') : null);
+    const origenCard = evt && evt.target && evt.target.closest ? evt.target.closest('.product-card, .of-card') : null;
+    animarAgregarCarrito(origenCard ? origenCard.querySelector('.img-box img, .of-img img') : null);
 }
 
 function showToast() {
@@ -2091,6 +2180,7 @@ async function saveP() {
         nombre: nom,
         precio: parseFloat(document.getElementById("fPre").value) || 0,
         precio_may: parseFloat(document.getElementById("fPreMay").value) || 0,
+        precioAnterior: parseFloat(document.getElementById("fPreAnt").value) || 0,
         stock: parseInt(document.getElementById("fStock").value) || 0,
         promo: document.getElementById("fPro").value.trim(),
         destacado: document.getElementById("fDestacado").checked,
@@ -2140,6 +2230,7 @@ function limpiarP() {
     document.getElementById("fNom").value = "";
     document.getElementById("fPre").value = "";
     document.getElementById("fPreMay").value = "";
+    document.getElementById("fPreAnt").value = "";
     document.getElementById("fStock").value = "10";
     document.getElementById("fPro").value = "";
     document.getElementById("fDestacado").checked = false;
@@ -2162,6 +2253,7 @@ async function editP(id) {
     document.getElementById("fNom").value = p.nombre || "";
     document.getElementById("fPre").value = p.precio || "";
     document.getElementById("fPreMay").value = p.precio_may || "";
+    document.getElementById("fPreAnt").value = p.precioAnterior || "";
     document.getElementById("fStock").value = p.stock !== undefined ? p.stock : 10;
     document.getElementById("fPro").value = p.promo || "";
     document.getElementById("fDestacado").checked = !!p.destacado;
