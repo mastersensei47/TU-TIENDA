@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261007-lateral">
+    <link rel="stylesheet" href="style.css?v=20261007-mayorista">
 
     <!-- PWA: capturar la oportunidad de instalación antes de que Firebase/JS termine de cargar. -->
     <script>
@@ -96,6 +96,7 @@
 
 <div class="cat-scroll" id="catBar"></div>
 <div class="cat-grid" id="catGrid"></div>
+<div id="portalBanners"></div>
 <div class="of-sec" id="ofertasSec"></div>
 
 <div id="catalogoWrap">
@@ -145,6 +146,8 @@
 
 </div>
 </div>
+
+<div id="portalCtas"></div>
 
 <div id="toast">✅ Producto agregado al carrito</div>
 <div id="imageModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.95);display:none;align-items:center;justify-content:center;z-index:9000;" onclick="if(event.target.id==='imageModal')this.style.display='none';">
@@ -474,13 +477,33 @@
                     <h4 style="margin-top:0; opacity:0.7;">Estilo de tienda</h4>
                     <div class="form-group">
                         <label>Estilo de la tienda</label>
-                        <select id="cfgEstiloTienda">
+                        <select id="cfgEstiloTienda" onchange="actualizarCamposEstilo()">
                             <option value="clasico">Clásico (el de siempre)</option>
                             <option value="fotos">Categorías con tarjetas fotográficas</option>
                             <option value="ofertas">Liquidación y ofertas (carrusel)</option>
                             <option value="lateral">Menú lateral de categorías</option>
+                            <option value="mayorista">Portal mayorista (banners y grilla compacta)</option>
                         </select>
-                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.<br><br>«Liquidación y ofertas» agrega un carrusel arriba del catálogo con los productos que tengan cargado un «Precio anterior» mayor al precio actual (campo nuevo en cada producto).<br><br>«Menú lateral» muestra las categorías en una columna fija a la izquierda y el catálogo a la derecha, con el orden («Más nuevo a más viejo», precio, A a Z) y un filtro arriba a la derecha, y tarjetas minimalistas. En celulares se usan los chips de siempre.</small>
+                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.<br><br>«Liquidación y ofertas» agrega un carrusel arriba del catálogo con los productos que tengan cargado un «Precio anterior» mayor al precio actual (campo nuevo en cada producto).<br><br>«Menú lateral» muestra las categorías en una columna fija a la izquierda y el catálogo a la derecha, con el orden («Más nuevo a más viejo», precio, A a Z) y un filtro arriba a la derecha, y tarjetas minimalistas. En celulares se usan los chips de siempre.<br><br>«Portal mayorista» usa el slider hero como banner principal de ancho completo, una grilla compacta de categorías (3 columnas, con foto de fondo), banners en el medio y accesos directos al final.</small>
+                    </div>
+
+                    <div id="cfgPortal" style="display:none; background:rgba(255,255,255,0.035); padding:15px; border-radius:14px; margin-bottom:20px;">
+                        <h4 style="margin:0 0 14px; opacity:0.8;">Portal mayorista</h4>
+                        <div class="form-group">
+                            <label>Texto de las categorías</label>
+                            <select id="cfgPortalTextoPos">
+                                <option value="izq">Esquina superior izquierda</option>
+                                <option value="centro">Centrado</option>
+                            </select>
+                            <small style="display:block; opacity:0.55; margin-top:6px;">Va en el color de acento de tu tienda (si es muy oscuro, se usa blanco para que se lea). Las fotos se cargan en «Categorías», más abajo.</small>
+                        </div>
+                        <label style="display:block; font-size:12px; opacity:0.6; font-weight:700; margin:16px 0 4px;">BANNERS DEL MEDIO (fechas especiales, categorías clave)</label>
+                        <div id="edBannersMedio"></div>
+                        <button type="button" class="btn-add" style="background:rgba(255,255,255,0.1); width:auto; margin:4px 0 18px;" onclick="portalAgregar('bannersMedio')">+ Agregar banner</button>
+                        <label style="display:block; font-size:12px; opacity:0.6; font-weight:700; margin:6px 0 4px;">ACCESOS DIRECTOS DEL FINAL</label>
+                        <div id="edCtas"></div>
+                        <button type="button" class="btn-add" style="background:rgba(255,255,255,0.1); width:auto; margin:4px 0 8px;" onclick="portalAgregar('ctas')">+ Agregar acceso directo</button>
+                        <small style="display:block; opacity:0.55; line-height:1.45;">El banner principal de arriba se carga en la pestaña «Slider hero». Tocá «Guardar configuración» para aplicar los cambios.</small>
                     </div>
 
                     <h4 style="margin-top:30px; opacity:0.7;">Catálogo</h4>
@@ -746,6 +769,6 @@
 
 <script src="config.js" defer></script>
 <script src="deudas.js?v=20260929-deudas" defer></script>
-<script src="app.js?v=20261007-lateral" defer></script>
+<script src="app.js?v=20261007-mayorista" defer></script>
 </body>
 </html>
