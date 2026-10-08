@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261007-fotos">
+    <link rel="stylesheet" href="style.css?v=20261007-ofertas">
 
     <!-- PWA: capturar la oportunidad de instalación antes de que Firebase/JS termine de cargar. -->
     <script>
@@ -96,6 +96,7 @@
 
 <div class="cat-scroll" id="catBar"></div>
 <div class="cat-grid" id="catGrid"></div>
+<div class="of-sec" id="ofertasSec"></div>
 
 <div id="filtroCompatContainer" style="display:none; padding:0 16px 12px; gap:8px; flex-wrap:wrap;">
     <select id="filtroMarca" onchange="cambiarFiltroMarca()" style="flex:1; min-width:140px; padding:11px 12px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:13px;">
@@ -199,6 +200,8 @@
                 <div class="form-group"><label>Nombre del Producto</label><input id="fNom"></div>
                 <div class="form-group"><label>Precio Normal ($)</label><input id="fPre" type="number"></div>
                 <div class="form-group precio-mayorista-field"><label>Precio Mayorista ($)</label><input id="fPreMay" type="number"></div>
+                <div class="form-group"><label>Precio anterior ($) — opcional</label><input id="fPreAnt" type="number" min="0" placeholder="Ej: el precio de antes de la oferta">
+                    <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.4;">Si es mayor al precio normal, se muestra tachado con el % OFF y el producto aparece en el carrusel de «Liquidación y ofertas». Solo lo ven los clientes minoristas.</small></div>
                 <div class="form-group"><label>Stock disponible</label><input id="fStock" type="number" min="0" value="10"></div>
                 <div class="form-group"><label>Oferta Especial (texto libre, ej: "2x1")</label><input id="fPro"></div>
                 <div class="form-group">
@@ -447,8 +450,9 @@
                         <select id="cfgEstiloTienda">
                             <option value="clasico">Clásico (el de siempre)</option>
                             <option value="fotos">Categorías con tarjetas fotográficas</option>
+                            <option value="ofertas">Liquidación y ofertas (carrusel)</option>
                         </select>
-                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.</small>
+                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.<br><br>«Liquidación y ofertas» agrega un carrusel arriba del catálogo con los productos que tengan cargado un «Precio anterior» mayor al precio actual (campo nuevo en cada producto).</small>
                     </div>
 
                     <h4 style="margin-top:30px; opacity:0.7;">Catálogo</h4>
@@ -714,6 +718,6 @@
 
 <script src="config.js" defer></script>
 <script src="deudas.js?v=20260929-deudas" defer></script>
-<script src="app.js?v=20261007-fotos" defer></script>
+<script src="app.js?v=20261007-ofertas" defer></script>
 </body>
 </html>
