@@ -502,6 +502,7 @@ function init() {
     if (Array.isArray(prodsCache) && prodsCache.length) {
         prods = prodsCache;
         productosListos = true;
+        try { renderCategoriasFotos(); } catch (e) { console.warn("renderCategoriasFotos (caché):", e); }
         try { render(); } catch (e) { console.warn("render (caché):", e); }
     }
     const heroCache = leerCacheLS("tu_tienda_hero_" + slugCache);
@@ -519,6 +520,7 @@ function init() {
         });
         productosListos = true;
         guardarCacheLS("tu_tienda_prods_" + slugCache, prods);
+        try { renderCategoriasFotos(); } catch (e) { console.warn("renderCategoriasFotos:", e); }
         render();
         if (esAdmin) renderAdmP();
         poblarFiltroCompatibilidad();
@@ -664,6 +666,7 @@ function aplicarLayout() {
     document.body.classList.toggle("img-effect-gradient", l.imageEffect === "gradient");
     document.body.classList.toggle("cart-style-modal", l.cartStyle === "modal");
     document.body.classList.toggle("glow-effect", !!l.glowEffect);
+    document.body.classList.toggle("estilo-fotos", l.estiloTienda === "fotos");
 }
 
 // ==================== PWA / INSTALACIÓN ====================
@@ -812,6 +815,51 @@ function renderCategorias() {
         <div class="cat-item${filterCat === c.id ? " active" : ""}" onclick="setCat(this, '${String(c.id).replace(/'/g, "\\'")}')">${c.icon || ""} ${(c.label || "").replace(/</g, "&lt;")}</div>
     `).join("");
     cont.innerHTML = chipTodos + chips;
+    try { renderCategoriasFotos(); } catch (e) { console.warn("renderCategoriasFotos:", e); }
+}
+
+// ==================== ESTILO: CATEGORÍAS CON TARJETAS FOTOGRÁFICAS ====================
+// Reemplaza los chips de categorías por una grilla de tarjetas rectangulares
+// con una foto de fondo (3 columnas en PC, 2 en celular), una capa oscura
+// translúcida encima y el nombre centrado en blanco y negrita.
+// La foto de cada categoría sale de, en este orden: la que cargó el dueño en
+// Configuración → Catálogo → Categorías, la foto del primer producto de esa
+// categoría, o un fondo de color con el acento de la tienda.
+function estiloTiendaActual() {
+    return (STORE_CONFIG && STORE_CONFIG.layout && STORE_CONFIG.layout.estiloTienda) || "clasico";
+}
+
+function escHtml(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function imagenDeCategoria(c) {
+    const propia = String(c.imagen || "").trim();
+    if (propia) return propia;
+    const p = prods.find(x => x.categoria === c.id && ((x.imagenes && x.imagenes[0]) || x.imagen));
+    return p ? ((p.imagenes && p.imagenes[0]) || p.imagen) : "";
+}
+
+function renderCategoriasFotos() {
+    const cont = document.getElementById("catGrid");
+    if (!cont) return;
+    if (estiloTiendaActual() !== "fotos") { cont.innerHTML = ""; return; }
+    const tarjeta = (id, texto, img) => {
+        const url = img ? miniaturaImg(img, 700).replace(/'/g, "%27").replace(/"/g, "%22").replace(/\(/g, "%28").replace(/\)/g, "%29") : "";
+        return `<div class="cat-photo${filterCat === id ? " active" : ""}" data-cat="${escHtml(id)}" onclick="elegirCategoriaFoto(this.dataset.cat)"${url ? ` style="background-image:url('${url}')"` : ""}><span>${escHtml(texto)}</span></div>`;
+    };
+    cont.innerHTML = tarjeta("", "🗂️ Todos", "") +
+        (STORE_CONFIG.categories || []).map(c => tarjeta(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim(), imagenDeCategoria(c))).join("");
+}
+
+function elegirCategoriaFoto(id) {
+    filterCat = id;
+    renderCategoriasFotos();
+    render();
+    if (id !== "") {
+        const destino = document.querySelector(".search-container");
+        if (destino) destino.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 }
 
 // Llena el <select id="fCat"> del formulario de producto (panel admin) con
@@ -871,14 +919,48 @@ function renderCategoriasEditor() {
         return;
     }
     cont.innerHTML = categoriasEditando.map((c, i) => `
-        <div class="admin-item" style="padding:10px; gap:8px;">
+        <div class="admin-item" style="padding:10px; gap:8px; flex-wrap:wrap;">
             <input value="${(c.icon || '').replace(/"/g, '&quot;')}" onchange="actualizarCategoria(${i}, 'icon', this.value)" placeholder="🔧" style="width:50px; text-align:center; flex:none;">
             <input value="${(c.label || '').replace(/"/g, '&quot;')}" onchange="actualizarCategoria(${i}, 'label', this.value)" placeholder="Nombre" style="flex:1;">
             <button onclick="moverCategoria(${i}, -1)" ${i === 0 ? 'disabled' : ''} style="background:none; border:none; cursor:pointer; font-size:16px; opacity:${i === 0 ? '0.3' : '1'};">⬆️</button>
             <button onclick="moverCategoria(${i}, 1)" ${i === categoriasEditando.length - 1 ? 'disabled' : ''} style="background:none; border:none; cursor:pointer; font-size:16px; opacity:${i === categoriasEditando.length - 1 ? '0.3' : '1'};">⬇️</button>
             <button onclick="borrarCategoriaEditor(${i})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px;">🗑️</button>
+            <div style="flex:1 1 100%; display:flex; gap:8px; align-items:center;">
+                ${c.imagen ? `<img src="${escHtml(c.imagen)}" alt="" style="width:44px; height:44px; object-fit:cover; border-radius:8px; flex:none;">` : ''}
+                <input value="${escHtml(c.imagen || '')}" onchange="actualizarCategoria(${i}, 'imagen', this.value.trim()); renderCategoriasEditor();" placeholder="Foto de la categoría (link) — opcional" style="flex:1; min-width:0;">
+                <button onclick="subirFotoCategoria(${i}, this)" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; flex:none;">📷 Subir</button>
+            </div>
         </div>
     `).join('');
+}
+
+function subirFotoCategoria(i, boton) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) return alert("Tiene que ser una imagen.");
+        if (file.size > 8 * 1024 * 1024) return alert("La imagen pesa más de 8MB. Probá con una más liviana.");
+        const textoOriginal = boton ? boton.innerText : "";
+        if (boton) { boton.disabled = true; boton.innerText = "⏳ Subiendo..."; }
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+            const respuesta = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: formData });
+            const data = await respuesta.json();
+            if (!respuesta.ok || !data.secure_url) throw new Error((data.error && data.error.message) || ("Cloudinary respondió " + respuesta.status));
+            if (categoriasEditando[i]) categoriasEditando[i].imagen = data.secure_url;
+            renderCategoriasEditor();
+        } catch (e) {
+            console.error("Error subiendo foto de categoría:", e);
+            alert("No se pudo subir la foto: " + (e.message || e));
+            if (boton) { boton.disabled = false; boton.innerText = textoOriginal; }
+        }
+    };
+    input.click();
 }
 
 function actualizarCategoria(i, campo, valor) {
@@ -2775,6 +2857,7 @@ function cargarFormConfig() {
     cargarCategoriasEditor();
 
     const l = STORE_CONFIG.layout || {};
+    document.getElementById("cfgEstiloTienda").value = l.estiloTienda || "clasico";
     document.getElementById("cfgCatalogView").value = l.catalogView || "grid2";
     document.getElementById("cfgHeaderSticky").checked = l.headerSticky !== false;
     document.getElementById("cfgHeaderStyle").value = l.headerStyle || "floating";
@@ -2844,6 +2927,7 @@ async function guardarConfigTienda() {
             userRegistration: true
         },
         layout: {
+            estiloTienda: document.getElementById("cfgEstiloTienda").value,
             catalogView: document.getElementById("cfgCatalogView").value,
             headerSticky: document.getElementById("cfgHeaderSticky").checked,
             headerStyle: document.getElementById("cfgHeaderStyle").value,
