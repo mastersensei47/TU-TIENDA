@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261007-fotos">
 
     <!-- PWA: capturar la oportunidad de instalación antes de que Firebase/JS termine de cargar. -->
     <script>
@@ -95,6 +95,7 @@
 </div>
 
 <div class="cat-scroll" id="catBar"></div>
+<div class="cat-grid" id="catGrid"></div>
 
 <div id="filtroCompatContainer" style="display:none; padding:0 16px 12px; gap:8px; flex-wrap:wrap;">
     <select id="filtroMarca" onchange="cambiarFiltroMarca()" style="flex:1; min-width:140px; padding:11px 12px; border-radius:12px; background:var(--card); color:var(--text); border:1px solid rgba(255,255,255,0.1); font-size:13px;">
@@ -440,7 +441,17 @@
 
             <div id="subtab-catalogo" class="admin-subtab-panel" style="display:none;">
                 <div class="admin-form-box">
-                    <h4 style="margin-top:0; opacity:0.7;">Catálogo</h4>
+                    <h4 style="margin-top:0; opacity:0.7;">Estilo de tienda</h4>
+                    <div class="form-group">
+                        <label>Estilo de la tienda</label>
+                        <select id="cfgEstiloTienda">
+                            <option value="clasico">Clásico (el de siempre)</option>
+                            <option value="fotos">Categorías con tarjetas fotográficas</option>
+                        </select>
+                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.</small>
+                    </div>
+
+                    <h4 style="margin-top:30px; opacity:0.7;">Catálogo</h4>
                     <div class="form-group">
                         <label>Vista del catálogo (en celulares)</label>
                         <select id="cfgCatalogView">
@@ -703,6 +714,6 @@
 
 <script src="config.js" defer></script>
 <script src="deudas.js?v=20260929-deudas" defer></script>
-<script src="app.js?v=20260930-claves" defer></script>
+<script src="app.js?v=20261007-fotos" defer></script>
 </body>
 </html>
