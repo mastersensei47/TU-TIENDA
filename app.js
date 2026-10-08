@@ -668,6 +668,8 @@ function aplicarLayout() {
     document.body.classList.toggle("glow-effect", !!l.glowEffect);
     document.body.classList.toggle("estilo-fotos", l.estiloTienda === "fotos");
     document.body.classList.toggle("estilo-ofertas", l.estiloTienda === "ofertas");
+    document.body.classList.toggle("estilo-lateral", l.estiloTienda === "lateral");
+    try { renderSideCats(); } catch (e) { console.warn("renderSideCats:", e); }
     try { renderOfertas(true); } catch (e) { console.warn("renderOfertas:", e); }
 }
 
@@ -852,6 +854,67 @@ function renderCategoriasFotos() {
     };
     cont.innerHTML = tarjeta("", "🗂️ Todos", "") +
         (STORE_CONFIG.categories || []).map(c => tarjeta(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim(), imagenDeCategoria(c))).join("");
+}
+
+// ==================== ESTILO: MENÚ LATERAL DE CATEGORÍAS ====================
+// Dos columnas: a la izquierda un menú vertical fijo con todas las categorías
+// y a la derecha el catálogo, con el orden y un filtro arriba a la derecha.
+// Tarjetas minimalistas (fondo blanco, título centrado, precio destacado) y
+// etiqueta opcional "Cantidad mínima". En celulares el menú lateral se
+// reemplaza por los chips de categorías de siempre.
+let ordenActual = "nuevo";
+let filterMostrar = "";
+
+function renderSideCats() {
+    const cont = document.getElementById("sideCats");
+    if (!cont) return;
+    if (estiloTiendaActual() !== "lateral") { cont.innerHTML = ""; return; }
+    const item = (id, texto) =>
+        `<div class="side-item${filterCat === id ? " active" : ""}" data-cat="${escHtml(id)}" onclick="elegirCategoriaLateral(this.dataset.cat)">${escHtml(texto)}</div>`;
+    cont.innerHTML = `<div class="side-title">Categorías</div>` +
+        item("", "🗂️ Todas las categorías") +
+        (STORE_CONFIG.categories || []).map(c => item(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim())).join("");
+}
+
+function elegirCategoriaLateral(id) {
+    filterCat = id;
+    renderSideCats();
+    document.querySelectorAll("#catBar .cat-item").forEach(el => el.classList.remove("active"));
+    renderCategorias();
+    render();
+}
+
+function cambiarOrden(v) { ordenActual = v || "nuevo"; render(); }
+function cambiarMostrar(v) { filterMostrar = v || ""; render(); }
+
+function pasaFiltroMostrar(p) {
+    if (!filterMostrar || estiloTiendaActual() !== "lateral") return true;
+    if (filterMostrar === "ofertas") return !!infoDescuento(p);
+    if (filterMostrar === "stock") {
+        const conVariantes = p.tieneVariantes && STORE_CONFIG.features.productVariants;
+        return !(p.sinStock || (!conVariantes && Number(p.stock) <= 0));
+    }
+    return true;
+}
+
+function ordenarProductos(lista) {
+    const precio = p => Number(isMay ? (p.precio_may || p.precio) : p.precio) || 0;
+    const creado = p => Number(p.creado) || 0;   // los productos viejos (sin fecha) cuentan como los más antiguos
+    const orden = {
+        nuevo:  (a, b) => creado(b) - creado(a),
+        viejo:  (a, b) => creado(a) - creado(b),
+        pmenor: (a, b) => precio(a) - precio(b),
+        pmayor: (a, b) => precio(b) - precio(a),
+        az:     (a, b) => String(a.nombre || "").localeCompare(String(b.nombre || ""), "es")
+    }[ordenActual] || null;
+    return orden ? lista.sort(orden) : lista;
+}
+
+function actualizarTituloLista(cantidad) {
+    const el = document.getElementById("ordenTitulo");
+    if (!el) return;
+    const cat = (STORE_CONFIG.categories || []).find(c => c.id === filterCat);
+    el.textContent = `${cat ? (cat.label || "") : "Todos los productos"} · ${cantidad} ${cantidad === 1 ? "producto" : "productos"}`;
 }
 
 // ==================== ESTILO: LIQUIDACIÓN Y OFERTAS (CARRUSEL) ====================
@@ -1251,13 +1314,17 @@ function render() {
     const modeloSel = document.getElementById("filtroModelo");
     const marcaElegida = marcaSel ? marcaSel.value : "";
     const modeloElegido = modeloSel ? modeloSel.value : "";
-    const filtered = prods.filter(p =>
+    let filtered = prods.filter(p =>
         p.nombre.toLowerCase().includes(query) &&
         (filterCat === "" || p.categoria === filterCat) &&
+        pasaFiltroMostrar(p) &&
         (marcaElegida === "" || (Array.isArray(p.compatibilidad) && p.compatibilidad.some(c =>
             c.marca === marcaElegida && (modeloElegido === "" || c.modelo === modeloElegido)
         )))
     );
+
+    if (estiloTiendaActual() === "lateral") filtered = ordenarProductos(filtered);
+    actualizarTituloLista(filtered.length);
 
     if (filtered.length === 0) {
         cont.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:80px 20px; opacity:0.5;">No se encontraron productos...</div>`;
@@ -1284,6 +1351,7 @@ function render() {
                     <div class="prod-title">${p.nombre}</div>
                     ${desc ? `<div class="price-old-row"><span class="price-old">${STORE_CONFIG.currency}${desc.anterior}</span><span class="badge-off">${desc.pct}% OFF</span></div>` : ''}
                     <div class="price-val">${STORE_CONFIG.currency}${precioActual}</div>
+                    ${Number(p.cantMin) > 1 ? `<div class="card-min">Cantidad mínima: ${Number(p.cantMin)}</div>` : ''}
                     ${conVariantes ? '' : bajoStock ? `<div class="stock-info stock-bajo">⚡ ¡Solo quedan ${p.stock}!</div>` : `<div class="stock-info">Stock: ${p.stock} unidades</div>`}
                     ${sinStock && !conVariantes
                         ? `<button class="btn-add btn-avisar" onclick="event.stopImmediatePropagation(); abrirAvisoStock('${p.id}')">🔔 Avisame cuando haya</button>`
@@ -2181,6 +2249,7 @@ async function saveP() {
         precio: parseFloat(document.getElementById("fPre").value) || 0,
         precio_may: parseFloat(document.getElementById("fPreMay").value) || 0,
         precioAnterior: parseFloat(document.getElementById("fPreAnt").value) || 0,
+        cantMin: parseInt(document.getElementById("fCantMin").value) || 0,
         stock: parseInt(document.getElementById("fStock").value) || 0,
         promo: document.getElementById("fPro").value.trim(),
         destacado: document.getElementById("fDestacado").checked,
@@ -2201,6 +2270,7 @@ async function saveP() {
         if (id) {
             await db.collection("productos").doc(id).update(data);
         } else {
+            data.creado = Date.now();   // para poder ordenar "más nuevo a más viejo"
             const ref = await db.collection("productos").add(data);
             productId = ref.id;
         }
@@ -2231,6 +2301,7 @@ function limpiarP() {
     document.getElementById("fPre").value = "";
     document.getElementById("fPreMay").value = "";
     document.getElementById("fPreAnt").value = "";
+    document.getElementById("fCantMin").value = "";
     document.getElementById("fStock").value = "10";
     document.getElementById("fPro").value = "";
     document.getElementById("fDestacado").checked = false;
@@ -2254,6 +2325,7 @@ async function editP(id) {
     document.getElementById("fPre").value = p.precio || "";
     document.getElementById("fPreMay").value = p.precio_may || "";
     document.getElementById("fPreAnt").value = p.precioAnterior || "";
+    document.getElementById("fCantMin").value = p.cantMin || "";
     document.getElementById("fStock").value = p.stock !== undefined ? p.stock : 10;
     document.getElementById("fPro").value = p.promo || "";
     document.getElementById("fDestacado").checked = !!p.destacado;
@@ -3102,6 +3174,7 @@ function setCat(el, cat) {
     filterCat = cat;
     document.querySelectorAll('.cat-item').forEach(item => item.classList.remove('active'));
     el.classList.add('active');
+    try { renderSideCats(); } catch (_) {}
     render();
 }
 
