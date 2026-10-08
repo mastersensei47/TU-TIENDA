@@ -669,6 +669,8 @@ function aplicarLayout() {
     document.body.classList.toggle("estilo-fotos", l.estiloTienda === "fotos");
     document.body.classList.toggle("estilo-ofertas", l.estiloTienda === "ofertas");
     document.body.classList.toggle("estilo-lateral", l.estiloTienda === "lateral");
+    document.body.classList.toggle("estilo-mayorista", l.estiloTienda === "mayorista");
+    try { renderPortal(); } catch (e) { console.warn("renderPortal:", e); }
     try { renderSideCats(); } catch (e) { console.warn("renderSideCats:", e); }
     try { renderOfertas(true); } catch (e) { console.warn("renderOfertas:", e); }
 }
@@ -847,13 +849,182 @@ function imagenDeCategoria(c) {
 function renderCategoriasFotos() {
     const cont = document.getElementById("catGrid");
     if (!cont) return;
-    if (estiloTiendaActual() !== "fotos") { cont.innerHTML = ""; return; }
+    const est = estiloTiendaActual();
+    if (est !== "fotos" && est !== "mayorista") { cont.innerHTML = ""; cont.className = "cat-grid"; return; }
+    // Portal mayorista: grilla compacta (3 columnas), texto arriba a la izquierda o centrado, en el color de acento
+    const compacto = est === "mayorista";
+    cont.className = "cat-grid" + (compacto ? " compacto " + (((STORE_CONFIG.layout || {}).portalTextoPos === "centro") ? "txt-centro" : "txt-izq") : "");
+    const colorTexto = compacto ? colorTextoCategorias() : "";
+    if (colorTexto) cont.style.setProperty("--cat-texto", colorTexto); else cont.style.removeProperty("--cat-texto");
     const tarjeta = (id, texto, img) => {
         const url = img ? miniaturaImg(img, 700).replace(/'/g, "%27").replace(/"/g, "%22").replace(/\(/g, "%28").replace(/\)/g, "%29") : "";
         return `<div class="cat-photo${filterCat === id ? " active" : ""}" data-cat="${escHtml(id)}" onclick="elegirCategoriaFoto(this.dataset.cat)"${url ? ` style="background-image:url('${url}')"` : ""}><span>${escHtml(texto)}</span></div>`;
     };
     cont.innerHTML = tarjeta("", "🗂️ Todos", "") +
         (STORE_CONFIG.categories || []).map(c => tarjeta(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim(), imagenDeCategoria(c))).join("");
+}
+
+// ==================== ESTILO: PORTAL / MAYORISTA ====================
+// Banner principal de ancho completo (el slider hero de siempre), grilla de
+// categorías compacta (3 columnas) con fotos de fondo y el nombre en el color
+// de acento, bloques de banners horizontales en el medio (fechas especiales,
+// categorías clave) y accesos directos (CTA) al final. Los banners y accesos
+// directos se cargan en Configuración → Catálogo → Estilo de la tienda.
+let portalEdit = { bannersMedio: [], ctas: [] };   // lo que se está editando en el panel
+
+function urlHttpSegura(u) {
+    u = String(u || "").trim();
+    if (!u) return "";
+    if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+    try {
+        const x = new URL(u);
+        return (x.protocol === "http:" || x.protocol === "https:") ? x.href : "";
+    } catch (_) { return ""; }
+}
+
+function cssUrlSegura(u) {
+    const x = urlHttpSegura(u);
+    return x ? x.replace(/'/g, "%27").replace(/"/g, "%22").replace(/\(/g, "%28").replace(/\)/g, "%29") : "";
+}
+
+// Si el acento es muy oscuro, el texto de las categorías pasa a blanco para que se lea sobre la foto.
+function colorTextoCategorias() {
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    let r, g, b, m;
+    if ((m = /^#([0-9a-f]{6})$/i.exec(v))) { const n = parseInt(m[1], 16); r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255; }
+    else if ((m = /^#([0-9a-f]{3})$/i.exec(v))) { r = parseInt(m[1][0] + m[1][0], 16); g = parseInt(m[1][1] + m[1][1], 16); b = parseInt(m[1][2] + m[1][2], 16); }
+    else if ((m = /^rgb\((\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(v))) { r = +m[1]; g = +m[2]; b = +m[3]; }
+    else return "";
+    const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+    return L < 0.12 ? "#ffffff" : "";
+}
+
+function irDestino(destino, url) {
+    destino = String(destino || "");
+    if (destino === "todo") {
+        elegirCategoriaFoto("");
+        const d = document.querySelector(".search-container");
+        if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (destino === "wa") {
+        const n = String(STORE_CONFIG.whatsappNumber || "").replace(/\D/g, "");
+        if (n) window.open("https://wa.me/" + n, "_blank", "noopener");
+    } else if (destino === "url") {
+        const u = urlHttpSegura(url);
+        if (u) window.open(u, "_blank", "noopener");
+    } else if (destino.startsWith("cat:")) {
+        elegirCategoriaFoto(destino.slice(4));
+    }
+}
+
+function renderPortal() {
+    const top = document.getElementById("portalBanners");
+    const bottom = document.getElementById("portalCtas");
+    if (!top || !bottom) return;
+    if (estiloTiendaActual() !== "mayorista") { top.innerHTML = ""; bottom.innerHTML = ""; return; }
+    const l = STORE_CONFIG.layout || {};
+    const banners = (Array.isArray(l.bannersMedio) ? l.bannersMedio : []).filter(b => b && (b.imagen || b.titulo));
+    const ctas = (Array.isArray(l.ctas) ? l.ctas : []).filter(c => c && c.titulo);
+    const datos = x => `data-d="${escHtml(x.destino || "")}" data-u="${escHtml(x.url || "")}"`;
+
+    top.innerHTML = banners.length ? `<div class="portal-banners">${banners.map(b => {
+        const img = b.imagen ? cssUrlSegura(miniaturaImg(b.imagen, 1400)) : "";
+        return `<div class="portal-banner${b.destino ? "" : " sin-destino"}" ${datos(b)} onclick="irDestino(this.dataset.d, this.dataset.u)"${img ? ` style="background-image:url('${img}')"` : ""}>${b.titulo ? `<span class="pb-titulo">${escHtml(b.titulo)}</span>` : ""}</div>`;
+    }).join("")}</div>` : "";
+
+    bottom.innerHTML = ctas.length ? `<div class="portal-ctas">${ctas.map(c =>
+        `<div class="portal-cta${c.destino ? "" : " sin-destino"}" ${datos(c)} onclick="irDestino(this.dataset.d, this.dataset.u)"><div><b>${escHtml(c.titulo)}</b>${c.subtitulo ? `<small>${escHtml(c.subtitulo)}</small>` : ""}</div><span aria-hidden="true">→</span></div>`
+    ).join("")}</div>` : "";
+}
+
+// ---- editor en el panel de configuración ----
+function actualizarCamposEstilo() {
+    const sel = document.getElementById("cfgEstiloTienda");
+    const box = document.getElementById("cfgPortal");
+    if (box && sel) box.style.display = sel.value === "mayorista" ? "block" : "none";
+}
+
+function opcionesDestino(actual) {
+    const base = [["", "Sin acción"], ["todo", "Ver todos los productos"], ["wa", "Abrir WhatsApp de la tienda"], ["url", "Link externo"]]
+        .concat((STORE_CONFIG.categories || []).map(c => ["cat:" + c.id, "Categoría: " + (c.label || c.id)]));
+    return base.map(([v, t]) => `<option value="${escHtml(v)}"${v === (actual || "") ? " selected" : ""}>${escHtml(t)}</option>`).join("");
+}
+
+function renderPortalEditor() {
+    const fila = (clave, it, i) => {
+        const conImagen = clave === "bannersMedio";
+        const set = (campo, extra) => `onchange="portalCampo('${clave}', ${i}, '${campo}', this.value.trim())${extra || ""}"`;
+        return `
+        <div class="admin-item" style="padding:10px; gap:8px; flex-wrap:wrap;">
+            ${conImagen && it.imagen ? `<img src="${escHtml(it.imagen)}" alt="" style="width:44px; height:44px; object-fit:cover; border-radius:8px; flex:none;">` : ""}
+            ${conImagen ? `<input value="${escHtml(it.imagen || "")}" ${set("imagen", "; renderPortalEditor()")} placeholder="Imagen del banner (link)" style="flex:1 1 200px; min-width:0;">
+            <button type="button" onclick="portalSubirImagen(${i}, this)" style="background:rgba(255,255,255,0.1); color:var(--text); border:none; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700; flex:none;">📷 Subir</button>` : ""}
+            <input value="${escHtml(it.titulo || "")}" ${set("titulo")} placeholder="${conImagen ? "Título (ej: Hot Sale)" : "Título (ej: Escribinos por WhatsApp)"}" style="flex:1 1 170px; min-width:0;">
+            ${conImagen ? "" : `<input value="${escHtml(it.subtitulo || "")}" ${set("subtitulo")} placeholder="Texto de apoyo (opcional)" style="flex:1 1 170px; min-width:0;">`}
+            <select ${set("destino", "; renderPortalEditor()")} style="flex:1 1 170px; min-width:0;">${opcionesDestino(it.destino)}</select>
+            ${it.destino === "url" ? `<input value="${escHtml(it.url || "")}" ${set("url")} placeholder="https://..." style="flex:1 1 100%; min-width:0;">` : ""}
+            <button type="button" onclick="portalQuitar('${clave}', ${i})" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px;">🗑️</button>
+        </div>`;
+    };
+    [["bannersMedio", "edBannersMedio"], ["ctas", "edCtas"]].forEach(([clave, id]) => {
+        const cont = document.getElementById(id);
+        if (!cont) return;
+        cont.innerHTML = portalEdit[clave].length
+            ? portalEdit[clave].map((it, i) => fila(clave, it, i)).join("")
+            : `<p style="opacity:0.5; font-size:13px; margin:6px 0 10px;">Todavía no agregaste ninguno.</p>`;
+    });
+}
+
+function portalCampo(clave, i, campo, valor) {
+    if (portalEdit[clave] && portalEdit[clave][i]) portalEdit[clave][i][campo] = valor;
+}
+function portalAgregar(clave) {
+    portalEdit[clave].push(clave === "bannersMedio" ? { imagen: "", titulo: "", destino: "", url: "" } : { titulo: "", subtitulo: "", destino: "", url: "" });
+    renderPortalEditor();
+}
+function portalQuitar(clave, i) {
+    portalEdit[clave].splice(i, 1);
+    renderPortalEditor();
+}
+
+function portalSubirImagen(i, boton) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) return alert("Tiene que ser una imagen.");
+        if (file.size > 8 * 1024 * 1024) return alert("La imagen pesa más de 8MB. Probá con una más liviana.");
+        const original = boton ? boton.innerText : "";
+        if (boton) { boton.disabled = true; boton.innerText = "⏳ Subiendo..."; }
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+            const respuesta = await fetch(CLOUDINARY_UPLOAD_URL, { method: "POST", body: formData });
+            const data = await respuesta.json();
+            if (!respuesta.ok || !data.secure_url) throw new Error((data.error && data.error.message) || ("Cloudinary respondió " + respuesta.status));
+            portalCampo("bannersMedio", i, "imagen", data.secure_url);
+            renderPortalEditor();
+        } catch (e) {
+            console.error("Error subiendo banner:", e);
+            alert("No se pudo subir la imagen: " + (e.message || e));
+            if (boton) { boton.disabled = false; boton.innerText = original; }
+        }
+    };
+    input.click();
+}
+
+// Lo que se guarda: sin filas vacías y con los textos recortados
+function listaPortalParaGuardar(clave) {
+    const t = v => String(v || "").trim();
+    if (clave === "bannersMedio") {
+        return portalEdit.bannersMedio.map(b => ({ imagen: t(b.imagen), titulo: t(b.titulo), destino: t(b.destino), url: t(b.url) }))
+            .filter(b => b.imagen || b.titulo);
+    }
+    return portalEdit.ctas.map(c => ({ titulo: t(c.titulo), subtitulo: t(c.subtitulo), destino: t(c.destino), url: t(c.url) }))
+        .filter(c => c.titulo);
 }
 
 // ==================== ESTILO: MENÚ LATERAL DE CATEGORÍAS ====================
@@ -3022,6 +3193,11 @@ function cargarFormConfig() {
 
     const l = STORE_CONFIG.layout || {};
     document.getElementById("cfgEstiloTienda").value = l.estiloTienda || "clasico";
+    document.getElementById("cfgPortalTextoPos").value = l.portalTextoPos === "centro" ? "centro" : "izq";
+    portalEdit.bannersMedio = JSON.parse(JSON.stringify(Array.isArray(l.bannersMedio) ? l.bannersMedio : []));
+    portalEdit.ctas = JSON.parse(JSON.stringify(Array.isArray(l.ctas) ? l.ctas : []));
+    renderPortalEditor();
+    actualizarCamposEstilo();
     document.getElementById("cfgCatalogView").value = l.catalogView || "grid2";
     document.getElementById("cfgHeaderSticky").checked = l.headerSticky !== false;
     document.getElementById("cfgHeaderStyle").value = l.headerStyle || "floating";
@@ -3092,6 +3268,9 @@ async function guardarConfigTienda() {
         },
         layout: {
             estiloTienda: document.getElementById("cfgEstiloTienda").value,
+            portalTextoPos: document.getElementById("cfgPortalTextoPos").value === "centro" ? "centro" : "izq",
+            bannersMedio: listaPortalParaGuardar("bannersMedio"),
+            ctas: listaPortalParaGuardar("ctas"),
             catalogView: document.getElementById("cfgCatalogView").value,
             headerSticky: document.getElementById("cfgHeaderSticky").checked,
             headerStyle: document.getElementById("cfgHeaderStyle").value,
