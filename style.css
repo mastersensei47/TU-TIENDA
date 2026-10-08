@@ -761,3 +761,58 @@ body.precio-mayorista-oculto .precio-mayorista-field { display: none; }
     .admin-product-search { align-items:stretch; flex-direction:column; }
     .admin-search-count { align-self:flex-end; }
 }
+
+
+/* ==================== ESTILO: CATEGORÍAS CON TARJETAS FOTOGRÁFICAS ==================== */
+.cat-grid { display: none; }
+.search-container { scroll-margin-top: 90px; }
+body.estilo-fotos #catBar { display: none; }
+body.estilo-fotos .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 10px 20px 20px;
+}
+@media (max-width: 700px) {
+    body.estilo-fotos .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 8px 14px 16px; }
+}
+.cat-photo {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background-color: #1e293b;
+    background-image: linear-gradient(135deg, var(--accent), #0f172a);
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+/* Capa oscura translúcida: asegura que el texto blanco se lea sobre cualquier foto */
+.cat-photo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    transition: background 0.25s ease;
+}
+.cat-photo:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35); }
+.cat-photo:hover::before { background: rgba(0, 0, 0, 0.36); }
+.cat-photo span {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+    font-weight: 800;
+    font-size: 20px;
+    line-height: 1.25;
+    padding: 0 12px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+@media (max-width: 700px) { .cat-photo span { font-size: 15px; } }
+.cat-photo.active { outline: 3px solid var(--accent); outline-offset: -3px; }
