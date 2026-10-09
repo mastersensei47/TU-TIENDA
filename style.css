@@ -1109,3 +1109,200 @@ body.estilo-mayorista .cat-grid.compacto { grid-template-columns: repeat(3, 1fr)
 .portal-cta small { display: block; opacity: 0.85; margin-top: 4px; font-size: 13px; }
 .portal-cta span { font-size: 26px; font-weight: 800; flex: none; }
 @media (max-width: 700px) { .portal-ctas { padding: 0 14px; } }
+
+
+/* ==================== ESTILO: E-COMMERCE TECH ==================== */
+.hero-cta { display: none; }
+#techPagos:empty, #techTabsWrap:empty { display: none; }
+body.estilo-tech #catBar { display: none; }
+
+/* Hero grande, con bordes redondeados y botón destacado */
+body.estilo-tech .hero {
+    width: auto;
+    max-width: 1400px;
+    height: 460px;
+    margin: 14px auto 0;
+    left: auto;
+    transform: none;
+    border-radius: 24px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+}
+body.estilo-tech .hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0) 100%);
+    pointer-events: none;
+}
+body.estilo-tech .hero-content {
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 56px;
+    gap: 10px;
+}
+body.estilo-tech .hero-content h1,
+body.estilo-tech .hero-content p { display: block; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.5); max-width: 560px; }
+body.estilo-tech .hero-content h1 { font-size: 44px; font-weight: 900; line-height: 1.1; margin: 0; }
+body.estilo-tech .hero-content p { font-size: 18px; opacity: 0.92; margin: 0 0 12px; }
+body.estilo-tech .hero-content p:empty { display: none; }
+body.estilo-tech .hero-cta {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 9999px;
+    padding: 14px 38px;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+body.estilo-tech .hero-cta:hover { transform: translateY(-2px); filter: brightness(1.12); }
+@media (max-width: 900px) {
+    body.estilo-tech .hero { margin: 10px 14px 0; height: 300px; border-radius: 18px; }
+    body.estilo-tech .hero-content { padding: 0 24px; }
+    body.estilo-tech .hero-content h1 { font-size: 26px; }
+    body.estilo-tech .hero-content p { font-size: 14px; }
+    body.estilo-tech .hero-cta { padding: 12px 28px; font-size: 13px; }
+}
+
+/* Módulo de medios de pago, cuotas y promos */
+.tech-pagos {
+    display: flex;
+    gap: 12px;
+    max-width: 1400px;
+    margin: 16px auto 0;
+    padding: 0 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.tech-pagos::-webkit-scrollbar { display: none; }
+.tech-pago {
+    flex: 1 0 240px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    padding: 14px 18px;
+}
+.tech-pago-ico {
+    flex: none;
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.07);
+}
+.tech-pago b { display: block; font-size: 14.5px; font-weight: 800; line-height: 1.25; }
+.tech-pago small { display: block; margin-top: 2px; font-size: 12.5px; opacity: 0.65; line-height: 1.3; }
+@media (max-width: 700px) { .tech-pagos { padding: 0 14px; } .tech-pago { flex-basis: 220px; padding: 12px 14px; } }
+
+/* Pestañas tipo píldora con flechas */
+.tech-tabs-sec {
+    position: relative;
+    max-width: 1400px;
+    margin: 18px auto 4px;
+    padding: 0 20px;
+}
+.tech-tabs {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 2px;
+}
+.tech-tabs::-webkit-scrollbar { display: none; }
+.tech-tab {
+    flex: 0 0 auto;
+    padding: 10px 22px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.tech-tab:hover { background: rgba(255, 255, 255, 0.08); }
+.tech-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tech-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #fff;
+    color: #111827;
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: opacity 0.2s;
+}
+.tech-prev { left: 4px; }
+.tech-next { right: 4px; }
+.tech-arrow.tech-off { opacity: 0; pointer-events: none; }
+.tech-tabs-sec.tech-sin-scroll .tech-arrow { display: none; }
+@media (max-width: 700px) {
+    .tech-tabs-sec { padding: 0 14px; }
+    .tech-arrow { width: 30px; height: 30px; font-size: 19px; }
+    .tech-prev { left: 6px; }
+    .tech-next { right: 6px; }
+}
+
+/* Tarjetas: marca gris arriba, título limpio y precio verde destacado */
+.prod-brand { display: none; }
+body.estilo-tech .product-card {
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+}
+body.estilo-tech .info-box { padding: 16px 18px 18px; }
+body.estilo-tech .prod-brand {
+    display: block;
+    color: #9ca3af;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body.estilo-tech .prod-title {
+    font-size: 15px;
+    font-weight: 600;
+    min-height: 42px;
+    margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+body.estilo-tech .price-val {
+    display: inline-block;
+    align-self: flex-start;
+    background: var(--success);
+    color: #fff;
+    font-size: 19px;
+    font-weight: 900;
+    padding: 6px 14px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+body.estilo-tech .stock-info:not(.stock-bajo) { display: none; }
+body.estilo-tech .btn-add { border-radius: 10px; }
