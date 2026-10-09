@@ -670,6 +670,8 @@ function aplicarLayout() {
     document.body.classList.toggle("estilo-ofertas", l.estiloTienda === "ofertas");
     document.body.classList.toggle("estilo-lateral", l.estiloTienda === "lateral");
     document.body.classList.toggle("estilo-mayorista", l.estiloTienda === "mayorista");
+    document.body.classList.toggle("estilo-tech", l.estiloTienda === "tech");
+    try { renderTech(); } catch (e) { console.warn("renderTech:", e); }
     try { renderPortal(); } catch (e) { console.warn("renderPortal:", e); }
     try { renderSideCats(); } catch (e) { console.warn("renderSideCats:", e); }
     try { renderOfertas(true); } catch (e) { console.warn("renderOfertas:", e); }
@@ -822,6 +824,7 @@ function renderCategorias() {
     `).join("");
     cont.innerHTML = chipTodos + chips;
     try { renderCategoriasFotos(); } catch (e) { console.warn("renderCategoriasFotos:", e); }
+    try { renderTech(); } catch (e) { console.warn("renderTech:", e); }
 }
 
 // ==================== ESTILO: CATEGORÍAS CON TARJETAS FOTOGRÁFICAS ====================
@@ -863,6 +866,98 @@ function renderCategoriasFotos() {
     cont.innerHTML = tarjeta("", "🗂️ Todos", "") +
         (STORE_CONFIG.categories || []).map(c => tarjeta(String(c.id), `${c.icon || ""} ${c.label || ""}`.trim(), imagenDeCategoria(c))).join("");
 }
+
+// ==================== ESTILO: E-COMMERCE TECH ====================
+// Hero grande con bordes redondeados y botón "VER TODO", módulo horizontal de
+// medios de pago / cuotas / promos, pestañas tipo chip con flechas de
+// desplazamiento y tarjetas con la marca arriba en gris y el precio en verde.
+let techFiltro = "all";   // "all" | "dest" | "nuevo" | "ofertas" | "cat:<id>"
+
+function techActivo() { return estiloTiendaActual() === "tech"; }
+
+function marcaDeProducto(p) {
+    const m = String(p.marca || "").trim();
+    if (m) return m;
+    const c = (STORE_CONFIG.categories || []).find(x => x.id === p.categoria);
+    return c ? String(c.label || "").trim() : "";
+}
+
+function pasaFiltroTech(p) {
+    if (!techActivo() || techFiltro === "all" || techFiltro.startsWith("cat:")) return true;
+    if (techFiltro === "dest") return !!p.destacado;
+    if (techFiltro === "nuevo") return !!p.nuevo;
+    if (techFiltro === "ofertas") return !!infoDescuento(p) || !!String(p.promo || "").trim();
+    return true;
+}
+
+function techPagosLista() {
+    const l = STORE_CONFIG.layout || {};
+    const propios = (Array.isArray(l.techPagos) ? l.techPagos : []).filter(x => x && x.titulo);
+    if (propios.length) return propios;
+    const pg = STORE_CONFIG.pagos || {};
+    const lista = [];
+    if (Number(pg.cuotasCantidad) > 0) lista.push({ icono: "💳", titulo: `Hasta ${Number(pg.cuotasCantidad)} cuotas`, texto: Number(pg.cuotasRecargoPct) > 0 ? `Con ${Number(pg.cuotasRecargoPct)}% de recargo` : "Sin interés" });
+    if (pg.transferencia) lista.push({ icono: "🏦", titulo: "Transferencia bancaria", texto: Number(pg.descuentoTransferenciaPct) > 0 ? `${Number(pg.descuentoTransferenciaPct)}% de descuento` : "Pagá por transferencia" });
+    if (pg.mercadopago) lista.push({ icono: "📲", titulo: "Mercado Pago", texto: "Pagá online de forma segura" });
+    if (pg.efectivo) lista.push({ icono: "💵", titulo: "Efectivo", texto: "Pagá al retirar o recibir" });
+    return lista;
+}
+
+function renderTech() {
+    const pagos = document.getElementById("techPagos");
+    const tabs = document.getElementById("techTabsWrap");
+    if (!pagos || !tabs) return;
+    if (!techActivo()) { pagos.innerHTML = ""; tabs.innerHTML = ""; return; }
+
+    const lista = techPagosLista();
+    pagos.innerHTML = lista.length ? `<div class="tech-pagos">${lista.map(x =>
+        `<div class="tech-pago"><span class="tech-pago-ico" aria-hidden="true">${escHtml(x.icono || "💳")}</span><div><b>${escHtml(x.titulo)}</b>${x.texto ? `<small>${escHtml(x.texto)}</small>` : ""}</div></div>`
+    ).join("")}</div>` : "";
+
+    const chip = (id, texto) =>
+        `<button type="button" class="tech-tab${techFiltro === id ? " active" : ""}" data-t="${escHtml(id)}" onclick="elegirTechTab(this.dataset.t)">${escHtml(texto)}</button>`;
+    tabs.innerHTML = `<div class="tech-tabs-sec">
+        <button type="button" class="tech-arrow tech-prev" aria-label="Anterior" onclick="techScrollTabs(-1)">‹</button>
+        <div class="tech-tabs" id="techTabs">` +
+            chip("all", "Todos") + chip("dest", "⭐ Destacados") + chip("nuevo", "🆕 Nuevos") + chip("ofertas", "🔥 Ofertas") +
+            (STORE_CONFIG.categories || []).map(c => chip("cat:" + c.id, `${c.icon || ""} ${c.label || ""}`.trim())).join("") +
+        `</div>
+        <button type="button" class="tech-arrow tech-next" aria-label="Siguiente" onclick="techScrollTabs(1)">›</button>
+    </div>`;
+    const t = document.getElementById("techTabs");
+    if (t) t.addEventListener("scroll", actualizarFlechasTech, { passive: true });
+    setTimeout(actualizarFlechasTech, 0);
+}
+
+function elegirTechTab(id) {
+    techFiltro = id || "all";
+    filterCat = techFiltro.startsWith("cat:") ? techFiltro.slice(4) : "";
+    document.querySelectorAll("#techTabs .tech-tab").forEach(b => b.classList.toggle("active", b.dataset.t === techFiltro));
+    render();
+}
+
+function techVerTodo() {
+    if (!techActivo()) return;
+    elegirTechTab("all");
+    const d = document.getElementById("techTabsWrap");
+    if (d) d.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function techScrollTabs(dir) {
+    const t = document.getElementById("techTabs");
+    if (t) t.scrollBy({ left: dir * Math.max(180, t.clientWidth * 0.7), behavior: "smooth" });
+}
+
+function actualizarFlechasTech() {
+    const t = document.getElementById("techTabs");
+    const sec = document.querySelector(".tech-tabs-sec");
+    if (!t || !sec) return;
+    sec.classList.toggle("tech-sin-scroll", t.scrollWidth <= t.clientWidth + 4);
+    const prev = sec.querySelector(".tech-prev"), next = sec.querySelector(".tech-next");
+    if (prev) prev.classList.toggle("tech-off", t.scrollLeft <= 2);
+    if (next) next.classList.toggle("tech-off", t.scrollLeft + t.clientWidth >= t.scrollWidth - 2);
+}
+window.addEventListener("resize", () => { try { actualizarFlechasTech(); } catch (_) {} });
 
 // ==================== ESTILO: PORTAL / MAYORISTA ====================
 // Banner principal de ancho completo (el slider hero de siempre), grilla de
@@ -942,6 +1037,8 @@ function actualizarCamposEstilo() {
     const sel = document.getElementById("cfgEstiloTienda");
     const box = document.getElementById("cfgPortal");
     if (box && sel) box.style.display = sel.value === "mayorista" ? "block" : "none";
+    const tech = document.getElementById("cfgTech");
+    if (tech && sel) tech.style.display = sel.value === "tech" ? "block" : "none";
 }
 
 function opcionesDestino(actual) {
@@ -1371,7 +1468,8 @@ function renderHeroSlider() {
         content = document.createElement('div');
         content.className = 'hero-content';
     }
-    content.innerHTML = `<h1>${STORE_CONFIG.storeName}</h1><p>${STORE_CONFIG.tagline}</p>`;
+    const textoBoton = escHtml(((STORE_CONFIG.layout || {}).techBoton || "VER TODO").trim() || "VER TODO");
+    content.innerHTML = `<h1>${STORE_CONFIG.storeName}</h1><p>${STORE_CONFIG.tagline}</p><button type="button" class="hero-cta" onclick="techVerTodo()">${textoBoton}</button>`;
     hero.innerHTML = '';
     hero.appendChild(content);
 
@@ -1489,6 +1587,7 @@ function render() {
         p.nombre.toLowerCase().includes(query) &&
         (filterCat === "" || p.categoria === filterCat) &&
         pasaFiltroMostrar(p) &&
+        pasaFiltroTech(p) &&
         (marcaElegida === "" || (Array.isArray(p.compatibilidad) && p.compatibilidad.some(c =>
             c.marca === marcaElegida && (modeloElegido === "" || c.modelo === modeloElegido)
         )))
@@ -1519,6 +1618,7 @@ function render() {
                     <img src="${miniaturaImg(firstImg, 500)}" alt="${p.nombre}" loading="${idxCard < 6 ? 'eager' : 'lazy'}" decoding="async">
                 </div>
                 <div class="info-box">
+                    ${techActivo() ? `<div class="prod-brand">${escHtml(marcaDeProducto(p))}</div>` : ''}
                     <div class="prod-title">${p.nombre}</div>
                     ${desc ? `<div class="price-old-row"><span class="price-old">${STORE_CONFIG.currency}${desc.anterior}</span><span class="badge-off">${desc.pct}% OFF</span></div>` : ''}
                     <div class="price-val">${STORE_CONFIG.currency}${precioActual}</div>
@@ -2417,6 +2517,7 @@ async function saveP() {
 
     const data = {
         nombre: nom,
+        marca: document.getElementById("fMarca").value.trim(),
         precio: parseFloat(document.getElementById("fPre").value) || 0,
         precio_may: parseFloat(document.getElementById("fPreMay").value) || 0,
         precioAnterior: parseFloat(document.getElementById("fPreAnt").value) || 0,
@@ -2469,6 +2570,7 @@ async function saveP() {
 function limpiarP() {
     document.getElementById("fId").value = "";
     document.getElementById("fNom").value = "";
+    document.getElementById("fMarca").value = "";
     document.getElementById("fPre").value = "";
     document.getElementById("fPreMay").value = "";
     document.getElementById("fPreAnt").value = "";
@@ -2493,6 +2595,7 @@ async function editP(id) {
     if (!p) return;
     document.getElementById("fId").value = p.id;
     document.getElementById("fNom").value = p.nombre || "";
+    document.getElementById("fMarca").value = p.marca || "";
     document.getElementById("fPre").value = p.precio || "";
     document.getElementById("fPreMay").value = p.precio_may || "";
     document.getElementById("fPreAnt").value = p.precioAnterior || "";
@@ -3197,6 +3300,9 @@ function cargarFormConfig() {
     portalEdit.bannersMedio = JSON.parse(JSON.stringify(Array.isArray(l.bannersMedio) ? l.bannersMedio : []));
     portalEdit.ctas = JSON.parse(JSON.stringify(Array.isArray(l.ctas) ? l.ctas : []));
     renderPortalEditor();
+    document.getElementById("cfgTechBoton").value = l.techBoton || "";
+    document.getElementById("cfgTechPagos").value = (Array.isArray(l.techPagos) ? l.techPagos : [])
+        .map(x => [x.icono || "", x.titulo || "", x.texto || ""].join(" | ")).join("\n");
     actualizarCamposEstilo();
     document.getElementById("cfgCatalogView").value = l.catalogView || "grid2";
     document.getElementById("cfgHeaderSticky").checked = l.headerSticky !== false;
@@ -3268,6 +3374,11 @@ async function guardarConfigTienda() {
         },
         layout: {
             estiloTienda: document.getElementById("cfgEstiloTienda").value,
+            techBoton: document.getElementById("cfgTechBoton").value.trim(),
+            techPagos: document.getElementById("cfgTechPagos").value.split("\n").map(linea => {
+                const [icono, titulo, ...resto] = linea.split("|").map(s => s.trim());
+                return titulo ? { icono: icono || "", titulo, texto: resto.join(" | ") } : null;
+            }).filter(Boolean).slice(0, 8),
             portalTextoPos: document.getElementById("cfgPortalTextoPos").value === "centro" ? "centro" : "izq",
             bannersMedio: listaPortalParaGuardar("bannersMedio"),
             ctas: listaPortalParaGuardar("ctas"),
