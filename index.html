@@ -94,6 +94,9 @@
     </div>
 </div>
 
+<div id="techPagos"></div>
+<div id="techTabsWrap"></div>
+
 <div class="cat-scroll" id="catBar"></div>
 <div class="cat-grid" id="catGrid"></div>
 <div id="portalBanners"></div>
@@ -226,6 +229,8 @@
             <div class="admin-form-box">
                 <input id="fId" type="hidden">
                 <div class="form-group"><label>Nombre del Producto</label><input id="fNom"></div>
+                <div class="form-group"><label>Marca — opcional</label><input id="fMarca" placeholder="Ej: Logitech">
+                    <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.4;">En el estilo «E-commerce Tech» se muestra arriba del título, en gris. Si lo dejás vacío se usa el nombre de la categoría.</small></div>
                 <div class="form-group"><label>Precio Normal ($)</label><input id="fPre" type="number"></div>
                 <div class="form-group precio-mayorista-field"><label>Precio Mayorista ($)</label><input id="fPreMay" type="number"></div>
                 <div class="form-group"><label>Cantidad mínima de compra — opcional</label><input id="fCantMin" type="number" min="0" placeholder="Ej: 6">
@@ -483,8 +488,22 @@
                             <option value="ofertas">Liquidación y ofertas (carrusel)</option>
                             <option value="lateral">Menú lateral de categorías</option>
                             <option value="mayorista">Portal mayorista (banners y grilla compacta)</option>
+                            <option value="tech">E-commerce Tech (hero, pagos y pestañas)</option>
                         </select>
-                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.<br><br>«Liquidación y ofertas» agrega un carrusel arriba del catálogo con los productos que tengan cargado un «Precio anterior» mayor al precio actual (campo nuevo en cada producto).<br><br>«Menú lateral» muestra las categorías en una columna fija a la izquierda y el catálogo a la derecha, con el orden («Más nuevo a más viejo», precio, A a Z) y un filtro arriba a la derecha, y tarjetas minimalistas. En celulares se usan los chips de siempre.<br><br>«Portal mayorista» usa el slider hero como banner principal de ancho completo, una grilla compacta de categorías (3 columnas, con foto de fondo), banners en el medio y accesos directos al final.</small>
+                        <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">«Tarjetas fotográficas» muestra las categorías como una grilla de fotos (3 columnas en PC, 2 en celular) con el nombre al medio. La foto de cada categoría la elegís más abajo, en «Categorías»; si no cargás una, se usa la foto de uno de sus productos.<br><br>«Liquidación y ofertas» agrega un carrusel arriba del catálogo con los productos que tengan cargado un «Precio anterior» mayor al precio actual (campo nuevo en cada producto).<br><br>«Menú lateral» muestra las categorías en una columna fija a la izquierda y el catálogo a la derecha, con el orden («Más nuevo a más viejo», precio, A a Z) y un filtro arriba a la derecha, y tarjetas minimalistas. En celulares se usan los chips de siempre.<br><br>«E-commerce Tech» muestra un hero grande con bordes redondeados y botón «VER TODO», un módulo de medios de pago y cuotas, pestañas tipo chip (Destacados, Nuevos, Ofertas y categorías) con flechas, y tarjetas con la marca arriba en gris y el precio en verde.<br><br>«Portal mayorista» usa el slider hero como banner principal de ancho completo, una grilla compacta de categorías (3 columnas, con foto de fondo), banners en el medio y accesos directos al final.</small>
+                    </div>
+
+                    <div id="cfgTech" style="display:none; background:rgba(255,255,255,0.035); padding:15px; border-radius:14px; margin-bottom:20px;">
+                        <h4 style="margin:0 0 14px; opacity:0.8;">E-commerce Tech</h4>
+                        <div class="form-group">
+                            <label>Texto del botón del hero</label>
+                            <input id="cfgTechBoton" placeholder="VER TODO">
+                        </div>
+                        <div class="form-group">
+                            <label>Módulo de pagos y promociones (una por línea)</label>
+                            <textarea id="cfgTechPagos" rows="5" placeholder="💳 | Hasta 12 cuotas sin interés | Con bancos seleccionados&#10;🏦 | Transferencia | Consultá el descuento vigente"></textarea>
+                            <small style="display:block; opacity:0.55; margin-top:6px; line-height:1.45;">Formato: <b>icono | título | texto de apoyo</b>. Si lo dejás vacío se muestran los medios de pago activos de tu tienda. Tocá «Guardar configuración» para aplicar.</small>
+                        </div>
                     </div>
 
                     <div id="cfgPortal" style="display:none; background:rgba(255,255,255,0.035); padding:15px; border-radius:14px; margin-bottom:20px;">
